@@ -70,6 +70,7 @@ static void paint(HWND hwnd, HDC hdc)
     g.peak = s_model.peak;
     g.mode_kpm = s_model.mode_kpm;
     g.bare = 1;                 /* no square panel: the dial only */
+    g.gear = s_model.gear;
 
     if (ensure_backbuffer(hdc, s_memW ? s_memW : M.rBezel * 2,
                           s_memH ? s_memH : M.rBezel * 2)) {
@@ -205,6 +206,7 @@ void Widget_SetModel(HWND hwnd, const WidgetModel *m)
         if (s_model.peak != m->peak) changed = 1;
         if (s_model.gauge_value != m->gauge_value) changed = 1;
         if (s_model.mode_kpm != m->mode_kpm) changed = 1;
+        if (lstrcmpA(s_model.gear, m->gear) != 0) changed = 1;
     }
     s_model = *m;
 

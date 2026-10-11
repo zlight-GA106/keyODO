@@ -413,6 +413,11 @@ static void draw_content(HDC hdc)
         g.needle = s_model.needle;
         g.mode_kpm = s_model.mode_kpm;
         g.bare = 0;                 /* the main window keeps the square panel */
+        /* The main window shows the gear in its own panel below the dial, so
+         * the dial's read-out stays a bare number. Must be set: leaving this
+         * uninitialised made Gauge_Draw read a garbage pointer and paint the
+         * read-out with whatever that memory held. */
+        g.gear = NULL;
         Gauge_Draw(hdc, &g);
     }
     RestoreDC(hdc, saved);

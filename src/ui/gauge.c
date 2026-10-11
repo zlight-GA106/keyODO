@@ -285,5 +285,16 @@ void Gauge_Draw(HDC hdc, const GaugeSpec *g)
     OffsetRect(&rc, -M.dialPanel.left + i, -M.dialPanel.top + n);
     Theme_Panel(hdc, &rc, t->window, TK_SUNKEN, M.bevel);
     wsprintfA(buf, "%d", (int)(g->value + 0.5));
-    Widget_TextCentered(hdc, &rc, buf, M.fReadout, t->windowtext, t->window);
+    if (g->gear != NULL && g->gear[0] != 0) {
+        /* Gear on the left, number hard against the right, so the pair
+         * reads as one "P 0" the way the main window's read-out does. */
+        COLORREF gc = (g->gear[0] == KG_RED_ONLY) ? t->red : t->windowtext;
+        int vw = Widget_TextWidth(hdc, M.fReadout, buf);
+        Widget_TextLeft(hdc, rc.left + Metrics_S(8), &rc, g->gear,
+                        M.fReadout, gc, t->window);
+        Widget_TextLeft(hdc, rc.right - Metrics_S(8) - vw, &rc, buf,
+                        M.fReadout, t->windowtext, t->window);
+    } else {
+        Widget_TextCentered(hdc, &rc, buf, M.fReadout, t->windowtext, t->window);
+    }
 }

@@ -31,6 +31,8 @@ u32.SetProcessDPIAware()
 u32.FindWindowA.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
 u32.FindWindowA.restype = wt.HWND
 u32.GetWindowRect.argtypes = [wt.HWND, ctypes.POINTER(wt.RECT)]
+u32.IsWindowVisible.argtypes = [wt.HWND]
+u32.IsWindowVisible.restype = wt.BOOL
 u32.PostMessageA.argtypes = [wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM]
 u32.PrintWindow.argtypes = [wt.HWND, wt.HDC, wt.UINT]
 u32.PrintWindow.restype = wt.BOOL
@@ -77,6 +79,16 @@ def set_gate(value):
         txt = re.sub(r"ShowGate=\d", "ShowGate=%d" % value, txt)
     else:
         txt = txt.rstrip() + "\n\n[View]\nShowGate=%d\n" % value
+    os.makedirs(os.path.dirname(INI), exist_ok=True)
+    open(INI, "w", encoding="gbk").write(txt)
+
+
+def set_widget(value):
+    txt = open(INI, encoding="gbk").read() if os.path.exists(INI) else ""
+    if "[Widget]" in txt:
+        txt = re.sub(r"Shown=\d", "Shown=%d" % value, txt)
+    else:
+        txt = txt.rstrip() + "\n\n[Widget]\nShown=%d\nX=200\nY=200\n" % value
     os.makedirs(os.path.dirname(INI), exist_ok=True)
     open(INI, "w", encoding="gbk").write(txt)
 
@@ -183,6 +195,41 @@ def main():
     ini = read_ini()
     check("setting untouched", ini.get("View.ShowGate") == "1",
           "ShowGate=%r" % ini.get("View.ShowGate"))
+
+    print("\n=== menu: plain mouse clicks (no drag) ===")
+    # The first item of 查看 is 桌面仪表, which shows the detached gauge; that is
+    # observable from here, so the click can be checked end to end.
+    set_widget(0)
+    p, h = launch()
+    u32.PostMessageA(h, WM_LBUTTONDOWN, 1, (hit_y << 16) | (view_x & 0xFFFF))
+    time.sleep(0.6)
+    menu = u32.FindWindowA(b"KeyODO_Menu", None)
+    check("clicking the title opens the menu", bool(menu))
+    u32.PostMessageA(h, WM_LBUTTONUP, 0, (hit_y << 16) | (view_x & 0xFFFF))
+    time.sleep(0.5)
+    menu = u32.FindWindowA(b"KeyODO_Menu", None)
+    check("releasing on the title leaves it open", bool(menu),
+          "still there" if menu else "it closed on release")
+
+    if menu:
+        r = wt.RECT()
+        u32.GetWindowRect(menu, ctypes.byref(r))
+        # a point inside the first row: rows are ~17 logical px tall, and the
+        # menu is 11 items + 4 separators in total
+        row_y = max(4, (r.bottom - r.top) // 25)
+        u32.PostMessageA(menu, WM_LBUTTONDOWN, 1, (row_y << 16) | 40)
+        u32.PostMessageA(menu, WM_LBUTTONUP, 0, (row_y << 16) | 40)
+        time.sleep(0.6)
+        check("clicking an item closes the menu",
+              not u32.FindWindowA(b"KeyODO_Menu", None))
+        g = u32.FindWindowA(b"KeyODO_Gauge", None)
+        check("the clicked item actually took effect",
+              bool(g) and bool(u32.IsWindowVisible(g)),
+              "desktop gauge is now visible")
+    u32.PostMessageA(h, WM_CLOSE, 0, 0)
+    time.sleep(1.0)
+    p.wait(timeout=10)
+    set_widget(0)
 
     print("\n=== menu: clicking outside dismisses ===")
     p, h = launch()

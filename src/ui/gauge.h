@@ -7,12 +7,15 @@
 
 #include <windows.h>
 
+/* Every field must be set: the struct has no defaults, and a stale pointer
+ * in gear shows up as garbage text in the dial read-out. */
 typedef struct GaugeSpec {
     double value;      /* the switchable reading: WPM or KPM               */
     double peak;       /* peak WPM, drives the telltale -- always a speed  */
     double needle;     /* smoothed needle position, always in WPM          */
     int    mode_kpm;   /* selects the printed unit and the value scaling   */
     int    bare;       /* 1 = draw the dial alone, without its square panel */
+    const char *gear;  /* NULL = value centred; else gear left, value right */
 } GaugeSpec;
 
 /* Draws the dial at the current DC origin. The dial owns the rectangle

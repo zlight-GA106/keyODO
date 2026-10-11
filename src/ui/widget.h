@@ -23,6 +23,7 @@ typedef struct WidgetModel {
     double needle;        /* smoothed needle position, in WPM */
     double peak;          /* peak WPM, for the telltale */
     int    mode_kpm;      /* selects the printed unit */
+    char   gear[8];       /* shown beside the value, e.g. "P" */
 } WidgetModel;
 
 typedef struct WidgetHooks {

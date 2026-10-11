@@ -34,9 +34,16 @@ u32.GetWindowTextA.argtypes = [wt.HWND, ctypes.c_char_p, ctypes.c_int]
 u32.SendMessageA.argtypes = [wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM]
 u32.SendMessageA.restype = wt.LPARAM
 u32.IsWindowVisible.argtypes = [wt.HWND]
+u32.IsWindowEnabled.argtypes = [wt.HWND]
+u32.IsWindowEnabled.restype = wt.BOOL
 u32.GetDC.argtypes = [wt.HWND]
 u32.GetDC.restype = wt.HDC
 u32.EnumChildWindows.argtypes = [wt.HWND, ctypes.c_void_p, wt.LPARAM]
+u32.EnumWindows.argtypes = [ctypes.c_void_p, wt.LPARAM]
+u32.GetWindowThreadProcessId.argtypes = [wt.HWND, ctypes.POINTER(wt.DWORD)]
+u32.IsWindowVisible.argtypes = [wt.HWND]
+u32.IsWindowEnabled.argtypes = [wt.HWND]
+u32.IsWindowEnabled.restype = wt.BOOL
 
 g32 = ctypes.WinDLL("gdi32")
 g32.CreateCompatibleDC.argtypes = [wt.HDC]
@@ -68,6 +75,31 @@ class BI(ctypes.Structure):
     _fields_ = [("bmiHeader", BIH), ("bmiColors", wt.DWORD * 3)]
 
 
+def window_of_pid(pid, cls=b"#32770"):
+    """Top-level window of class `cls` belonging to `pid`.
+
+    FindWindow("#32770") returns the first dialog on the desktop, which may be
+    a stray installer left over from an earlier run -- that is exactly how a
+    blank 320x56 window got captured once."""
+    found = []
+
+    @ctypes.WINFUNCTYPE(wt.BOOL, wt.HWND, wt.LPARAM)
+    def cb(h, lp):
+        owner = wt.DWORD()
+        u32.GetWindowThreadProcessId(h, ctypes.byref(owner))
+        if owner.value != pid:
+            return True
+        buf = ctypes.create_string_buffer(64)
+        u32.GetClassNameA(h, buf, 64)
+        if buf.value == cls:
+            found.append(h)
+            return False
+        return True
+
+    u32.EnumWindows(cb, 0)
+    return found[0] if found else None
+
+
 def children(hwnd):
     out = []
 
@@ -81,11 +113,21 @@ def children(hwnd):
 
 
 def find_next(hwnd):
-    """The wizard's Next button, by caption."""
+    """The wizard's Next / Install / Finish button, by caption.
+
+    Only real buttons count: a static whose text happens to contain 安装 (the
+    page headers do) would otherwise be returned, and clicking it does nothing,
+    which stalls the walkthrough."""
     for h in children(hwnd):
+        cls = ctypes.create_string_buffer(64)
+        u32.GetClassNameA(h, cls, 64)
+        if cls.value != b"Button":
+            continue
         buf = ctypes.create_string_buffer(128)
         u32.GetWindowTextA(h, buf, 128)
         txt = buf.value.decode("gbk", "replace")
+        if not u32.IsWindowEnabled(h):
+            continue
         if "下一步" in txt or "安装" in txt or "完成" in txt:
             return h
     return None
@@ -175,14 +217,14 @@ def main(argv):
     bad = []
     try:
         hwnd = None
-        end = time.time() + 15
+        end = time.time() + 20
         while time.time() < end:
-            hwnd = u32.FindWindowA(b"#32770", None)
+            hwnd = window_of_pid(proc.pid)
             if hwnd:
                 break
             time.sleep(0.2)
         if not hwnd:
-            print("FAIL: installer window not found")
+            print("FAIL: installer window not found for pid %d" % proc.pid)
             return 1
         time.sleep(1.2)
 
@@ -197,10 +239,23 @@ def main(argv):
                 print("       (no Next button; stopping)")
                 break
             u32.SendMessageA(nxt, BM_CLICK, 0, 0)
-            time.sleep(1.5)
-            if not u32.IsWindowVisible(hwnd):
+            time.sleep(2.0)
+            # The dialog is rebuilt around the install page, so the handle can
+            # go stale; re-find it for a few seconds before giving up.
+            again = None
+            for _ in range(20):
+                if hwnd and u32.IsWindowVisible(hwnd):
+                    again = hwnd
+                    break
+                cand = window_of_pid(proc.pid)
+                if cand and u32.IsWindowVisible(cand):
+                    again = cand
+                    break
+                time.sleep(0.3)
+            if again is None:
                 print("       (wizard closed)")
                 break
+            hwnd = again
     finally:
         time.sleep(0.3)
         proc.terminate()

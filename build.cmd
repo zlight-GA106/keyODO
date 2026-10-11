@@ -128,25 +128,27 @@ if errorlevel 1 (
     exit /b 1
 )
 
-rem A running installer holds its own executable open, and makensis then fails
-rem with a bare "Can't open output file". Detect that first and say what to do.
-if exist "%DISTDIR%\KeyODO_Setup.exe" (
-    del /f /q "%DISTDIR%\KeyODO_Setup.exe" 2>nul
-    if exist "%DISTDIR%\KeyODO_Setup.exe" (
-        echo ERROR: %DISTDIR%\KeyODO_Setup.exe is in use.
-        echo        Close any running KeyODO installer or uninstaller window
-        echo        ^(including one left behind after a refused UAC prompt^),
-        echo        then run build.cmd again.
-        exit /b 1
-    )
-)
+rem A running installer holds its own executable open, so makensis cannot
+rem replace it and fails with a bare "Can't open output file". Rather than fail
+rem the whole build, write the installer under a second name and say so.
+rem (Deliberately not a parenthesised block: %SETUPNAME% would be expanded at
+rem parse time and the assignment inside the block would not be seen.)
+set "SETUPNAME=KeyODO_Setup.exe"
+if exist "%DISTDIR%\KeyODO_Setup.exe" del /f /q "%DISTDIR%\KeyODO_Setup.exe" 2>nul
+if not exist "%DISTDIR%\KeyODO_Setup.exe" goto :setupname_ok
+echo       note: %DISTDIR%\KeyODO_Setup.exe is in use
+echo             ^(a running installer or uninstaller still holds it^).
+echo             Writing KeyODO_Setup_new.exe instead; close that window and
+echo             rebuild to get the usual name back.
+set "SETUPNAME=KeyODO_Setup_new.exe"
+:setupname_ok
 
-"%MAKENSIS%" /V2 /DSRCDIR="%CD%" /DOUTDIR="%CD%\%OUTDIR%" /DDISTDIR="%CD%\%DISTDIR%" "%OUTDIR%\keyodo_utf8.nsi"
+"%MAKENSIS%" /V2 /DSETUP_NAME=%SETUPNAME% /DSRCDIR="%CD%" /DOUTDIR="%CD%\%OUTDIR%" /DDISTDIR="%CD%\%DISTDIR%" "%OUTDIR%\keyodo_utf8.nsi"
 if errorlevel 1 (
     echo ERROR: makensis failed.
     exit /b 1
 )
-echo       built %DISTDIR%\KeyODO_Setup.exe
+echo       built %DISTDIR%\%SETUPNAME%
 
 :done
 echo.

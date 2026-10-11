@@ -68,7 +68,7 @@ BEGIN
 
     IDS_STATUS_READY_EN       "Ready"
     IDS_ABOUT_TITLE_EN        "About KeyODO"
-    IDS_ABOUT_TEXT_EN         "KeyODO 0.2\n\nKeyboard odometer: counts keystrokes, WPM and KPM.\n\nOnly key press counts are kept; nothing you type is recorded."
+    IDS_ABOUT_TEXT_EN         "KeyODO 0.1\n\nKeyboard odometer: counts keystrokes, WPM and KPM.\n\nOnly key press counts are kept; nothing you type is recorded.\n\nKeyODO by zlight106@2026"
 
     IDS_WIDGET_MENU_MAIN_EN   "Show main window(&M)"
     IDS_WIDGET_MENU_HIDE_EN   "Hide desktop gauge(&H)"
@@ -137,7 +137,7 @@ BEGIN
 
     IDS_STATUS_READY    "就绪"
     IDS_ABOUT_TITLE     "关于 KeyODO"
-    IDS_ABOUT_TEXT      "KeyODO 0.1\n\n键盘里程表：统计按键次数、WPM 与 KPM。\n\n只记录按键次数，不记录任何输入内容。"
+    IDS_ABOUT_TEXT      "KeyODO 0.1\n\n键盘里程表：统计按键次数、WPM 与 KPM。\n\n只记录按键次数，不记录任何输入内容。\n\nKeyODO by zlight106@2026"
     IDS_WIDGET_MENU_MAIN   "显示主窗口(&M)"
     IDS_WIDGET_MENU_HIDE   "隐藏桌面仪表(&H)"
     IDS_WIDGET_MENU_EXIT   "退出(&X)"

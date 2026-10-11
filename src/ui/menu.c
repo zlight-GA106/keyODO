@@ -56,8 +56,12 @@ static int       s_count = 0;
 static int       s_hot = -1;
 static UINT      s_result = 0;
 static int       s_done = 0;
+/* Set when the menu was opened by a button that is still held down, so the
+ * matching button-up is not mistaken for a click outside. */
+static int       s_swallowUp = 0;
 static int       s_labelX = 0;      /* label origin, client space */
 static int       s_checkW = 0;
+static int       s_pad = 0;      /* width of the raised border */
 static int       s_textH = 0;       /* font cell height, for centring */
 static int       s_w = 0, s_h = 0;
 
@@ -184,7 +188,8 @@ static void build_boxes(const MenuDef *def)
     }
     ReleaseDC(NULL, hdc);
 
-    s_labelX = s_checkW + padL;
+    s_pad = M.bevel;
+    s_labelX = s_pad + s_checkW + padL;
     s_w = w;
     s_h = y;
 }
@@ -201,6 +206,7 @@ static void paint(HDC hdc)
 
     rc.left = 0; rc.top = 0; rc.right = s_w; rc.bottom = s_h;
     Theme_Fill(hdc, &rc, t->menu);
+    /* 2 px raised edge, the classic popup frame */
     Theme_DrawEdge(hdc, &rc, TK_RAISED, M.bevel);
 
     for (i = 0; i < s_count; i++) {
@@ -209,8 +215,15 @@ static void paint(HDC hdc)
         COLORREF bg, fg;
         int hot;
 
-        ir.left = 0; ir.top = b->y;
-        ir.right = s_w; ir.bottom = b->y + b->h;
+        /* Everything stays inside the border. Filling the item across the
+         * whole window is what used to paint the raised edge away, leaving
+         * a menu that looked flat. */
+        ir.left = s_pad;
+        ir.right = s_w - s_pad;
+        ir.top = (b->y < s_pad) ? s_pad : b->y;
+        ir.bottom = (b->y + b->h > s_h - s_pad) ? s_h - s_pad : b->y + b->h;
+        if (ir.bottom <= ir.top)
+            continue;
 
         if (b->flags & MIF_SEPARATOR) {
             int mid = b->y + b->h / 2;
@@ -234,17 +247,17 @@ static void paint(HDC hdc)
 
         if (b->flags & (MIF_CHECKED | MIF_RADIO)) {
             const unsigned short *m = (b->flags & MIF_RADIO) ? kBullet : kTick;
-            draw_mask(hdc, (s_checkW - tickW) / 2,
-                      ir.top + (b->h - tickH) / 2, m, 8, 7, fg, M.unit);
+            draw_mask(hdc, s_pad + (s_checkW - tickW) / 2,
+                      b->y + (b->h - tickH) / 2, m, 8, 7, fg, M.unit);
         }
 
         {
-            int y = ir.top + (b->h - s_textH) / 2;
+            int y = b->y + (b->h - s_textH) / 2;
             x = s_labelX;
             Widget_TextMnemonic(hdc, x, y, b->label, M.fUi, fg, bg);
             if (b->accel[0]) {
                 int aw = Widget_TextWidth(hdc, M.fUi, b->accel);
-                Widget_TextMnemonic(hdc, s_w - Metrics_S(12) - aw, y,
+                Widget_TextMnemonic(hdc, s_w - s_pad - Metrics_S(12) - aw, y,
                                     b->accel, M.fUi, fg, bg);
             }
         }
@@ -339,6 +352,16 @@ static LRESULT CALLBACK Menu_WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
     case WM_LBUTTONUP: {
         int i = item_at((short)LOWORD(lp), (short)HIWORD(lp));
+        if (s_swallowUp) {
+            /* The release of the click that opened the menu. Letting it
+             * dismiss the menu is what made the menu feel like it needed a
+             * press-and-drag: a plain click on a menu title opened and
+             * closed it in one gesture. Dragging onto an item and
+             * releasing there still selects, as system menus do. */
+            s_swallowUp = 0;
+            if (i < 0)
+                return 0;
+        }
         if (i >= 0 && (s_box[i].flags & MIF_DISABLED) == 0) {
             s_result = s_box[i].id;
             s_done = 1;
@@ -398,6 +421,9 @@ UINT Menu_Track(HWND owner, const MenuDef *def, int x, int y)
     s_hot = -1;
     s_result = 0;
     s_done = 0;
+    /* If the menu bar was clicked, that press is still down; its release
+     * arrives at the popup and must not count as "clicked outside". */
+    s_swallowUp = (GetKeyState(VK_LBUTTON) & 0x8000) ? 1 : 0;
 
     s_popup = CreateWindowExA(WS_EX_TOOLWINDOW | WS_EX_TOPMOST, MENU_CLASS, "",
                               WS_POPUP, x, y, s_w, s_h,

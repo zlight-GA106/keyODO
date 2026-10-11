@@ -49,6 +49,7 @@ static UiModel   s_ui;
 static int       s_dpiOverride = 0;   /* this run only; never written back */
 
 static void on_command(HWND hwnd, int id);
+static void widget_remember(void);
 
 /* ------------------------------------------------------------------ input */
 
@@ -131,7 +132,22 @@ static void build_widget(void)
     wm.needle = s_ui.needle;
     wm.peak = s_ui.peak;
     wm.mode_kpm = s_store.mode_kpm;
+    lstrcpynA(wm.gear, s_ui.gear, sizeof(wm.gear));
     Widget_SetModel(s_widget, &wm);
+}
+
+/* Settings are written the moment they change, not only on exit: a menu
+ * toggle that is lost to a crash or a forced kill is a lie. The totals are
+ * refreshed first so an intermediate save cannot write stale counters. */
+static void persist_now(void)
+{
+    StatsSnapshot snap;
+    Stats_Get(&snap);
+    s_store.odo = snap.odo;
+    s_store.trip = snap.trip;
+    s_store.max_wpm = snap.max_wpm;
+    widget_remember();
+    Storage_Save(&s_store);
 }
 
 static void refresh(void)
@@ -301,6 +317,7 @@ static void apply_topmost(void)
 static void on_command(HWND hwnd, int id)
 {
     int needMenuSync = 0;
+    int saveNow = 0;
 
     switch (id) {
     case IDM_EXIT:
@@ -334,35 +351,43 @@ static void on_command(HWND hwnd, int id)
     case IDM_SHOW_KPM:
         s_store.mode_kpm = !s_store.mode_kpm;
         needMenuSync = 1;
+        saveNow = 1;
+        saveNow = 1;
+        saveNow = 1;
         break;
 
     case IDM_SHOW_GEAR:
         s_store.show_gate = !s_store.show_gate;
         needMenuSync = 1;
+        saveNow = 1;
         break;
 
     case IDM_TM_AUTO:
         s_store.transmission = KTM_AUTO;
         Stats_SetTransmission(KTM_AUTO);
         needMenuSync = 1;
+        saveNow = 1;
         break;
 
     case IDM_TM_MANUAL:
         s_store.transmission = KTM_MANUAL;
         Stats_SetTransmission(KTM_MANUAL);
         needMenuSync = 1;
+        saveNow = 1;
         break;
 
     case IDM_TOPMOST:
         s_store.always_on_top = !s_store.always_on_top;
         apply_topmost();
         needMenuSync = 1;
+        saveNow = 1;
         break;
 
     case IDM_TRAY_ENABLE:
         s_store.tray_icon = !s_store.tray_icon;
         tray_apply();
         needMenuSync = 1;
+        saveNow = 1;
         break;
 
     case IDC_CAP_MIN:
@@ -395,6 +420,7 @@ static void on_command(HWND hwnd, int id)
                         MB_OK | MB_ICONWARNING);
         }
         needMenuSync = 1;
+        saveNow = 1;
         break;
 
     case IDM_FIT_TO_SCREEN:
@@ -405,29 +431,35 @@ static void on_command(HWND hwnd, int id)
         if (s_widget != NULL)
             Widget_Resize(s_widget);
         needMenuSync = 1;
+        saveNow = 1;
         break;
 
     case IDM_LANG_ZH:
         apply_language(I18N_LANG_ZH);
         needMenuSync = 1;
+        saveNow = 1;
         break;
 
     case IDM_LANG_EN:
         apply_language(I18N_LANG_EN);
         needMenuSync = 1;
+        saveNow = 1;
         break;
 
     case IDM_WIN5:
         s_store.window_secs = 5;
         Stats_SetWindow(5);
+        saveNow = 1;
         break;
     case IDM_WIN10:
         s_store.window_secs = 10;
         Stats_SetWindow(10);
+        saveNow = 1;
         break;
     case IDM_WIN30:
         s_store.window_secs = 30;
         Stats_SetWindow(30);
+        saveNow = 1;
         break;
 
     case IDM_ABOUT:
@@ -440,6 +472,8 @@ static void on_command(HWND hwnd, int id)
 
     Stats_Tick(Plat_TickMs());
     refresh();
+    if (saveNow)
+        persist_now();
     if (needMenuSync)
     Ui_InvalidateDynamic(hwnd);
 }

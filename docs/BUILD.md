@@ -218,6 +218,19 @@ python tools\make_dial_icon.py --source build\dial_hi.png --out res\keyodo.ico
 python mockup\keyodo_mockup.py
 ```
 
+### 安装程序输出文件被占用
+
+安装程序会一直持有自己的可执行文件。如果有一个安装/卸载窗口开着，`makensis` 就无法
+替换 `dist\KeyODO_Setup.exe`（报 `Can't open output file`）。这种情况 `build.cmd`
+不会让整个构建失败，而是改写成 `dist\KeyODO_Setup_new.exe` 并打印说明；关掉那个窗口
+再构建即可恢复常规文件名。
+
+### 安装向导的自动化测试不会碰真实安装
+
+`tools\installer_ui_test.py` 用 `/DUITEST` 构建的副本会把目标目录指向
+`%TEMP%\KeyODO_uitest`，跳过注册表与快捷方式，并且忽略 `InstallDirRegKey`——否则它会被
+已安装版本的记录拖回真实的 `Program Files`，把真实的卸载信息覆盖掉。
+
 ### 指定缩放（调试与偏好）
 
 ```cmd

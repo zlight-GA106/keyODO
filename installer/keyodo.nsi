@@ -58,8 +58,19 @@ Name "${APP_NAME} ${APP_VERSION}"
   !endif
 !endif
 OutFile "${DISTDIR}\${SETUP_NAME}"
-InstallDir "$PROGRAMFILES\${APP_NAME}"
-InstallDirRegKey HKLM "${APP_KEY}" "InstallDir"
+/* The UI test build installs into a scratch directory and leaves the
+ * registry and the shortcuts alone: otherwise walking the wizard would
+ * overwrite a real installation's Add/Remove entry. */
+!ifdef UITEST
+  InstallDir "$TEMP\KeyODO_uitest"
+!else
+  InstallDir "$PROGRAMFILES\${APP_NAME}"
+!endif
+!ifndef UITEST
+  /* Remembering the previous location is right for a real install, but it
+   * would drag the UI test build back into the real Program Files folder. */
+  InstallDirRegKey HKLM "${APP_KEY}" "InstallDir"
+!endif
 SetCompressor /SOLID lzma
 ShowInstDetails show
 ShowUninstDetails show
@@ -75,7 +86,9 @@ VIAddVersionKey "LegalCopyright"  "${APP_PUBLISHER}"
 /* --- pages -------------------------------------------------------------- */
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${APP_EXE}"
-!define MUI_FINISHPAGE_RUN_TEXT "立即运行 KeyODO"
+/* Via LangString, like every other visible string: a literal here would go
+ * through the script's parse-time codepage conversion and come out as ?????. */
+!define MUI_FINISHPAGE_RUN_TEXT "$(FINISH_RUN_TEXT)"
 
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_DIRECTORY
@@ -96,6 +109,7 @@ LangString NEED_ADMIN     ${LANG_SIMPCHINESE} "安装 KeyODO 需要管理员权�
 LangString LNK_APP        ${LANG_SIMPCHINESE} "KeyODO"
 LangString LNK_UNINST     ${LANG_SIMPCHINESE} "卸载 KeyODO"
 LangString SM_GROUP       ${LANG_SIMPCHINESE} "KeyODO"
+LangString FINISH_RUN_TEXT ${LANG_SIMPCHINESE} "立即运行 KeyODO"
 LangString UNINST_KEEP    ${LANG_SIMPCHINESE} "已卸载 KeyODO。$\r$\n$\r$\n个人统计数据仍保留在：$\r$\n$APPDATA\KeyODO$\r$\n如需彻底清除，请手动删除该文件夹。"
 
 /* --- init --------------------------------------------------------------- */
@@ -174,6 +188,7 @@ Section "$(SEC_MAIN_NAME)" SEC_MAIN
 
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
+!ifndef UITEST
   WriteRegStr HKLM "${APP_KEY}" "InstallDir" "$INSTDIR"
   WriteRegStr HKLM "${APP_KEY}" "Version" "${APP_VERSION}"
 
@@ -192,9 +207,11 @@ Section "$(SEC_MAIN_NAME)" SEC_MAIN
   ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
   IntFmt $0 "0x%08X" $0
   WriteRegDWORD HKLM "${UNINST_KEY}" "EstimatedSize" "$0"
+!endif
 SectionEnd
 
 Section "$(SEC_STARTMENU_NAME)" SEC_STARTMENU
+!ifndef UITEST
   SectionIn RO
   SetShellVarContext all
   CreateDirectory "$SMPROGRAMS\$(SM_GROUP)"
@@ -202,12 +219,15 @@ Section "$(SEC_STARTMENU_NAME)" SEC_STARTMENU
                  "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_EXE}" 0
   CreateShortCut "$SMPROGRAMS\$(SM_GROUP)\$(LNK_UNINST).lnk" \
                  "$INSTDIR\uninstall.exe" "" "$INSTDIR\uninstall.exe" 0
+!endif
 SectionEnd
 
 Section "$(SEC_DESKTOP_NAME)" SEC_DESKTOP
+!ifndef UITEST
   SetShellVarContext all
   CreateShortCut "$DESKTOP\$(LNK_APP).lnk" \
                  "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_EXE}" 0
+!endif
 SectionEnd
 
 /* --- descriptions ------------------------------------------------------- */
