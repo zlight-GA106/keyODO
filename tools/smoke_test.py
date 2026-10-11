@@ -135,7 +135,12 @@ def run(exe, keys):
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import capture_window
         img = capture_window.grab(hwnd)
-        out = os.path.join(os.path.dirname(exe), "smoke_after.png")
+        # Never write next to the executable: an installed copy lives under
+        # Program Files, which is not writable without elevation.
+        here = os.path.dirname(os.path.abspath(__file__))
+        outdir = os.path.join(os.path.dirname(here), "build")
+        os.makedirs(outdir, exist_ok=True)
+        out = os.path.join(outdir, "smoke_after.png")
         img.save(out)
         print("OK  captured %s" % out)
 
