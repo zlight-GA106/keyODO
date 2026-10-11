@@ -69,14 +69,39 @@ static void paint(HWND hwnd, HDC hdc)
     g.needle = s_model.needle;
     g.peak = s_model.peak;
     g.mode_kpm = s_model.mode_kpm;
+    g.bare = 1;                 /* no square panel: the dial only */
 
-    if (ensure_backbuffer(hdc, s_memW ? s_memW : M.dialPanelW,
-                          s_memH ? s_memH : M.dialPanelH)) {
+    if (ensure_backbuffer(hdc, s_memW ? s_memW : M.rBezel * 2,
+                          s_memH ? s_memH : M.rBezel * 2)) {
+        /* Clear first. The dial only covers its own circle, so without this the
+         * surround would hold whatever CreateCompatibleBitmap left there --
+         * uninitialised memory, which shows up as artefacts inside the round
+         * window region. */
+        RECT all;
+        all.left = 0; all.top = 0;
+        all.right = s_memW; all.bottom = s_memH;
+        Theme_Fill(s_memDC, &all, g_theme.face);
+
         Gauge_Draw(s_memDC, &g);
         BitBlt(hdc, 0, 0, s_memW, s_memH, s_memDC, 0, 0, SRCCOPY);
     } else {
         Gauge_Draw(hdc, &g);
     }
+}
+
+/* Clips the window to the dial's circle.
+ *
+ * SetWindowRgn gives a genuinely transparent surround without layered windows
+ * (which would be Windows 2000 and later) and without a colour key (which
+ * breaks on themes that reuse the key colour). It also makes the transparent
+ * corners click-through, so the widget only catches the mouse where it is
+ * actually visible. */
+static void apply_round_region(HWND hwnd)
+{
+    int d = 2 * Gauge_DialRadius();
+    HRGN rgn = CreateEllipticRgn(0, 0, d, d);
+    if (rgn != NULL)
+        SetWindowRgn(hwnd, rgn, TRUE);   /* the window owns the region now */
 }
 
 static LRESULT CALLBACK Widget_WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
@@ -148,7 +173,7 @@ HWND Widget_Create(HINSTANCE hInst, const WidgetHooks *hooks)
     if (RegisterClassA(&wc) == 0)
         return NULL;
 
-    Gauge_Size(&w, &h);
+    Gauge_DialSize(&w, &h);
     x = GetSystemMetrics(SM_CXSCREEN) - w - 40;
     y = 40;
 
@@ -158,6 +183,7 @@ HWND Widget_Create(HINSTANCE hInst, const WidgetHooks *hooks)
                            x, y, w, h, NULL, NULL, hInst, NULL);
     if (hwnd == NULL)
         return NULL;
+    apply_round_region(hwnd);
     return hwnd;
 }
 
@@ -196,7 +222,7 @@ void Widget_Place(HWND hwnd, int x, int y)
 void Widget_PlaceClamped(HWND hwnd, int x, int y)
 {
     int w, h;
-    Gauge_Size(&w, &h);
+    Gauge_DialSize(&w, &h);
     Plat_ClampToWorkArea(&x, &y, w, h);
     Widget_Place(hwnd, x, y);
 }
@@ -236,9 +262,10 @@ void Widget_Resize(HWND hwnd)
     if (hwnd == NULL)
         return;
     free_backbuffer();
-    Gauge_Size(&w, &h);
+    Gauge_DialSize(&w, &h);
     Widget_GetPlace(hwnd, &x, &y);
     SetWindowPos(hwnd, NULL, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
+    apply_round_region(hwnd);
     Plat_ClampToWorkArea(&x, &y, w, h);
     Widget_Place(hwnd, x, y);
     InvalidateRect(hwnd, NULL, FALSE);

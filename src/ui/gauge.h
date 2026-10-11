@@ -12,6 +12,7 @@ typedef struct GaugeSpec {
     double peak;       /* peak WPM, drives the telltale -- always a speed  */
     double needle;     /* smoothed needle position, always in WPM          */
     int    mode_kpm;   /* selects the printed unit and the value scaling   */
+    int    bare;       /* 1 = draw the dial alone, without its square panel */
 } GaugeSpec;
 
 /* Draws the dial at the current DC origin. The dial owns the rectangle
@@ -21,6 +22,14 @@ void Gauge_Draw(HDC hdc, const GaugeSpec *g);
 
 /* Size of the dial panel in device pixels, for the current metrics. */
 void Gauge_Size(int *w, int *h);
+
+/* Size of the dial alone -- the circular bezel's bounding box. The detached
+ * desktop widget uses this and clips itself to a matching circle, so what
+ * floats on the desktop is the instrument, not a grey square. */
+void Gauge_DialSize(int *w, int *h);
+
+/* Radius of that circle, in device pixels. */
+int  Gauge_DialRadius(void);
 
 /* Dirty rectangle in dial-local coordinates. */
 void Gauge_DirtyRect(RECT *out);

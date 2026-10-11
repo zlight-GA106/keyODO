@@ -43,6 +43,7 @@ static StoreData s_store;
 static const InputBackend *s_input = NULL;
 static int       s_running = 0;
 static UiModel   s_ui;
+static int       s_dpiOverride = 0;   /* this run only; never written back */
 
 static void on_command(HWND hwnd, int id);
 
@@ -373,7 +374,12 @@ int App_Init(HINSTANCE hInst, const char *cmdLine)
     Storage_Load(&s_store);
 
     /* Command line overrides, mainly so scaling and the two input backends can
-     * be exercised without editing the ini file. */
+     * be exercised without editing the ini file.
+     *
+     * The DPI override is deliberately kept OUT of s_store: it applies to this
+     * run only. Writing it back would mean one `--dpi=96` debugging run pinned
+     * the saved setting to 96 permanently. */
+    s_dpiOverride = s_store.dpi_override;
     if (cmdLine != NULL) {
         const char *p;
         if (strstr(cmdLine, "--input=hook") != NULL)
@@ -390,11 +396,11 @@ int App_Init(HINSTANCE hInst, const char *cmdLine)
                 p++;
             }
             if (d >= 72 && d <= 480)
-                s_store.dpi_override = d;
+                s_dpiOverride = d;
         }
     }
 
-    Metrics_SetOverride(s_store.dpi_override);
+    Metrics_SetOverride(s_dpiOverride);
 
     Stats_Init(s_store.window_secs, s_store.transmission);
     Stats_Restore(s_store.odo, s_store.trip, s_store.max_wpm);

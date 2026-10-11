@@ -1,9 +1,13 @@
 /* ===========================================================================
  * widget.h -- the detached desktop gauge.
  *
- * Shows ONLY the speedometer component: the instrument panel, bezel, dial face,
- * ticks, numerals, needle, peak telltale and the embedded read-out. No group
- * box, no caption, no menu, no other read-out.
+ * Shows ONLY the speedometer component: bezel, dial face, ticks, numerals,
+ * needle, peak telltale and the embedded read-out. No square instrument panel,
+ * no group box, no caption, no menu, no other read-out.
+ *
+ * The window is clipped to the dial's circle with SetWindowRgn, so what floats
+ * on the desktop is the round instrument itself. The surround is genuinely
+ * transparent and click-through, and the corners do not eat mouse input.
  *
  * It is a separate top-level window so it can be parked anywhere on the
  * desktop, on top of other windows, independently of the main window.

@@ -433,6 +433,7 @@ static void draw_content(HDC hdc)
         g.peak = s_model.peak;
         g.needle = s_model.needle;
         g.mode_kpm = s_model.mode_kpm;
+        g.bare = 0;                 /* the main window keeps the square panel */
         Gauge_Draw(hdc, &g);
     }
     RestoreDC(hdc, saved);

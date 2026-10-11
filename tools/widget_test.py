@@ -34,6 +34,12 @@ u32.FindWindowA.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
 u32.FindWindowA.restype = wt.HWND
 u32.GetWindowRect.argtypes = [wt.HWND, ctypes.POINTER(wt.RECT)]
 u32.IsWindowVisible.argtypes = [wt.HWND]
+u32.GetWindowRgn.argtypes = [wt.HWND, wt.HANDLE]
+u32.GetWindowRgn.restype = ctypes.c_int
+g32 = ctypes.WinDLL("gdi32")
+g32.CreateRectRgn.argtypes = [ctypes.c_int] * 4
+g32.CreateRectRgn.restype = wt.HANDLE
+g32.DeleteObject.argtypes = [wt.HGDIOBJ]
 u32.PostMessageA.argtypes = [wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM]
 u32.SetWindowPos.argtypes = [wt.HWND, wt.HWND, ctypes.c_int, ctypes.c_int,
                              ctypes.c_int, ctypes.c_int, wt.UINT]
@@ -114,8 +120,9 @@ def system_dpi():
 
 def main():
     dpi = system_dpi()
-    dial = round(184 * dpi / 96)
-    print("=== desktop gauge ===  (display %d dpi, dial panel %dx%d)"
+    # the gauge is clipped to the dial's circle: diameter 2 * 86 px at 96 DPI
+    dial = round(172 * dpi / 96)
+    print("=== desktop gauge ===  (display %d dpi, dial %dx%d)"
           % (dpi, dial, dial))
 
     # 1. hidden by default
@@ -140,8 +147,14 @@ def main():
     time.sleep(0.6)
     check("gauge visible when Widget\\Shown=1", u32.IsWindowVisible(g))
     x, y, w, h = rect(g)
-    check("gauge is exactly the dial panel", (w, h) == (dial, dial),
+    check("gauge is exactly the dial circle", (w, h) == (dial, dial),
           "got %dx%d" % (w, h))
+    # the window must be clipped to a circle, so the square's corner has to be
+    # outside the region -- otherwise the old grey panel would still show
+    hrgn = g32.CreateRectRgn(0, 0, 1, 1)
+    n = u32.GetWindowRgn(g, hrgn)
+    check("gauge window is clipped to a region", n > 0, "region type %d" % n)
+    g32.DeleteObject(hrgn)
     check("gauge restored to the saved position", (x, y) == (140, 160),
           "got (%d,%d)" % (x, y))
     check("main window and gauge coexist", u32.IsWindowVisible(main_w))

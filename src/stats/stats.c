@@ -21,7 +21,25 @@
 #define STAMP_CAP       1024    /* keystrokes retained for the window      */
 #define MAX_WINDOW_SEC  60
 #define IDLE_MS         2500    /* "not moving" threshold for gear P       */
-#define TAU_MS          220.0   /* needle smoothing time constant          */
+
+/* Coast-down.
+ *
+ * The rate is a boxcar window, so after the last keystroke it would hold flat
+ * for the whole window and then drop off a cliff -- the needle sat still for
+ * several seconds and then snapped down. A speedometer does not behave that
+ * way: you lift off and the needle falls away smoothly. So once the keys have
+ * been quiet for FALL_GRACE_MS the indicated rate is multiplied by a decaying
+ * factor.
+ *
+ * The grace period matters: normal typing has gaps of 100-300 ms, and a short
+ * pause to think must not be mistaken for stopping. */
+#define FALL_GRACE_MS   600.0
+#define FALL_TAU_MS     900.0
+
+/* Needle inertia. Heavier on the way down than on the way up, which is what
+ * makes the fall read as a damped needle rather than a linear ramp. */
+#define TAU_RISE_MS     140.0
+#define TAU_FALL_MS     260.0
 
 #define MANUAL_M2_WPM   40.0
 #define MANUAL_M3_WPM   80.0
@@ -207,17 +225,30 @@ void Stats_Tick(unsigned long tickMs)
     s_kpm = (double)s_count * (60000.0 / ((double)s_windowSecs * 1000.0));
     s_wpm = s_kpm / 5.0;
 
+    /* Coast-down once the keyboard has been quiet for longer than the grace
+     * period. Applied to the rate itself so the needle, the dial read-out, the
+     * KPM panel and the status bar all tell the same story. */
+    if (s_lastKeyMs != 0 && tickMs > s_lastKeyMs) {
+        double idle = (double)(tickMs - s_lastKeyMs);
+        if (idle > FALL_GRACE_MS) {
+            double f = exp(-(idle - FALL_GRACE_MS) / FALL_TAU_MS);
+            s_kpm *= f;
+            s_wpm *= f;
+        }
+    }
+
     if (s_wpm > s_maxWpm)
         s_maxWpm = s_wpm;
 
-    /* exponential smoothing towards the instantaneous rate */
+    /* exponential smoothing towards the indicated rate */
     dt = tickMs - s_lastSmoothMs;
     if (s_lastSmoothMs == 0)
         dt = 33;
     s_lastSmoothMs = tickMs;
     if (dt > 500) dt = 500;             /* do not lurch after a stall */
 
-    alpha = 1.0 - exp(-((double)dt) / TAU_MS);
+    alpha = 1.0 - exp(-((double)dt) /
+                      (s_wpm >= s_needle ? TAU_RISE_MS : TAU_FALL_MS));
     if (alpha < 0.0) alpha = 0.0;
     if (alpha > 1.0) alpha = 1.0;
     s_needle += (s_wpm - s_needle) * alpha;

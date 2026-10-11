@@ -153,6 +153,18 @@ void Gauge_Size(int *w, int *h)
     if (h) *h = M.dialPanelH;
 }
 
+int Gauge_DialRadius(void)
+{
+    return M.rBezel;
+}
+
+void Gauge_DialSize(int *w, int *h)
+{
+    int d = 2 * M.rBezel;
+    if (w) *w = d;
+    if (h) *h = d;
+}
+
 void Gauge_DirtyRect(RECT *out)
 {
     out->left = 0;
@@ -167,7 +179,7 @@ void Gauge_Draw(HDC hdc, const GaugeSpec *g)
     RECT rc, box;
     POINT pts[128], poly[8];
     POINT p;
-    int n, cx = M.dialCx, cy = M.dialCy;
+    int n, cx, cy;
     int u = M.unit;
     double a, ux, uy;
     double scale = (double)M.dpi / 96.0;
@@ -176,9 +188,20 @@ void Gauge_Draw(HDC hdc, const GaugeSpec *g)
     int i;
     struct Corner { double r, off; } corner[5];
 
-    /* 1. recessed instrument panel */
-    rc.left = 0; rc.top = 0; rc.right = M.dialPanelW; rc.bottom = M.dialPanelH;
-    Theme_Panel(hdc, &rc, t->face, TK_SUNKEN, M.bevel);
+    /* Draw the dial alone, or the dial sitting in its recessed square panel.
+     * The centre follows whichever box is in use so the same routine serves
+     * the main window and the detached circular widget. */
+    if (g->bare) {
+        cx = cy = M.rBezel;
+    } else {
+        cx = M.dialCx;
+        cy = M.dialCy;
+
+        /* 1. recessed instrument panel */
+        rc.left = 0; rc.top = 0;
+        rc.right = M.dialPanelW; rc.bottom = M.dialPanelH;
+        Theme_Panel(hdc, &rc, t->face, TK_SUNKEN, M.bevel);
+    }
 
     /* 2. raised circular bezel: bevels split along the upper-left axis */
     fill_ellipse(hdc, cx, cy, M.rBezel, t->face);
@@ -254,10 +277,12 @@ void Gauge_Draw(HDC hdc, const GaugeSpec *g)
     fill_ellipse(hdc, cx, cy, M.hubDot, t->windowtext);
 
     /* 10. read-out embedded in the dial face, under the unit label.
-     *     Metrics expresses it in client space; the dial starts at the panel,
-     *     so shift it into the dial's own coordinates. */
+     *     Metrics expresses it relative to the panel; re-anchor it on whatever
+     *     centre this call is drawing around. */
+    i = cx - M.dialCx;                  /* shift from panel centre to here */
+    n = cy - M.dialCy;
     rc = M.dialEmbed;
-    OffsetRect(&rc, -M.dialPanel.left, -M.dialPanel.top);
+    OffsetRect(&rc, -M.dialPanel.left + i, -M.dialPanel.top + n);
     Theme_Panel(hdc, &rc, t->window, TK_SUNKEN, M.bevel);
     wsprintfA(buf, "%d", (int)(g->value + 0.5));
     Widget_TextCentered(hdc, &rc, buf, M.fReadout, t->windowtext, t->window);
