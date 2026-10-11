@@ -78,6 +78,16 @@ void Metrics_Done(void);
 void Metrics_SetOverride(int dpi);
 int  Metrics_GetOverride(void);
 
+/* When on (the default), the layout is shrunk if the monitor's work area
+ * cannot show it at its natural size, so the whole window stays reachable on
+ * a small screen or at a high scaling. */
+void Metrics_SetFitToScreen(int on);
+int  Metrics_GetFitToScreen(void);
+
+/* Diagnostics: pretend the work area is w x h, so the fit logic can be
+ * exercised on any machine. 0 restores the real work area. */
+void Metrics_SetWorkAreaOverride(int w, int h);
+
 /* Scales a 96-DPI value to device pixels. */
 int  Metrics_S(int v);
 

@@ -23,6 +23,8 @@
 #include "ui/widget.h"
 #include "ui/menu.h"
 #include "ui/metrics.h"
+#include "ui/tray.h"
+#include "i18n/i18n.h"
 #include "stats/stats.h"
 #include "input/input.h"
 #include "storage/storage.h"
@@ -113,6 +115,10 @@ static void build_model(void)
     s_ui.widget = (s_widget != NULL) && Widget_IsVisible(s_widget);
     s_ui.topmost = s_store.always_on_top;
     s_ui.window_secs = s_store.window_secs;
+    s_ui.tray = s_store.tray_icon;
+    s_ui.autostart = s_store.autostart;
+    s_ui.fit = s_store.fit_to_screen;
+    s_ui.language = s_store.language;
 }
 
 static void build_widget(void)
@@ -133,6 +139,83 @@ static void refresh(void)
     build_model();
     Ui_SetModel(s_hwnd, &s_ui);
     build_widget();
+}
+
+/* --------------------------------------------------------- notification ---
+ * The tray icon is created and destroyed on demand; its lifetime follows the
+ * setting, not the window's. */
+
+static void tray_apply(void)
+{
+    if (s_store.tray_icon) {
+        if (!Tray_Added()) {
+            Tray_Add(s_hwnd, s_inst, UIWM_TRAY, IDI_KEYODO,
+                     I18n_Str(IDS_TRAY_TIP));
+        } else {
+            Tray_SetTip(s_hwnd, I18n_Str(IDS_TRAY_TIP));
+        }
+    } else if (Tray_Added()) {
+        Tray_Remove(s_hwnd);
+    }
+}
+
+/* Right click on the tray icon: the same self-drawn menu as everywhere else. */
+static void tray_menu(POINT pt)
+{
+    MenuItem items[5];
+    MenuDef def;
+    UINT cmd;
+
+    Menu_Item(&items[0], IDM_TRAY_SHOW,  IDS_MENU_TRAY_SHOW, 0);
+    Menu_Item(&items[1], IDM_SHOW_WIDGET, IDS_MENU_WIDGET,
+              s_store.widget_shown ? MIF_CHECKED : 0);
+    Menu_Item(&items[2], IDM_TRAY_HIDE,  IDS_MENU_TRAY_HIDE,
+              s_store.widget_shown ? 0 : MIF_DISABLED);
+    Menu_Item(&items[3], 0, 0, MIF_SEPARATOR);
+    Menu_Item(&items[4], IDM_EXIT,       IDS_MENU_TRAY_EXIT, 0);
+    def.items = items;
+    def.count = 5;
+
+    SetForegroundWindow(s_hwnd);
+    cmd = Menu_Track(s_hwnd, &def, pt.x, pt.y);
+    if (cmd != 0)
+        on_command(s_hwnd, (int)cmd);
+}
+
+static void tray_callback(HWND hwnd, LPARAM lp)
+{
+    POINT pt;
+    switch ((UINT)lp) {
+    case WM_LBUTTONUP:
+        /* left click: bring the window back, restoring it if it is hidden */
+        ShowWindow(hwnd, IsIconic(hwnd) ? SW_RESTORE : SW_SHOW);
+        SetForegroundWindow(hwnd);
+        break;
+    case WM_RBUTTONUP:
+        GetCursorPos(&pt);
+        SetForegroundWindow(hwnd);
+        tray_menu(pt);
+        break;
+    default:
+        break;
+    }
+}
+
+/* ---------------------------------------------------------- language ----- */
+
+static void apply_language(int lang)
+{
+    s_store.language = lang;
+    I18n_SetLang(lang);
+
+    /* The UI face depends on the language, so the fonts have to be rebuilt and
+     * both windows resized before anything is repainted. */
+    Metrics_Init(s_hwnd);
+    Ui_ReloadStrings(s_hwnd);
+    if (s_widget != NULL)
+        Widget_Resize(s_widget);
+    tray_apply();
+    refresh();
 }
 
 /* ------------------------------------------------------------- the gauge */
@@ -276,6 +359,64 @@ static void on_command(HWND hwnd, int id)
         needMenuSync = 1;
         break;
 
+    case IDM_TRAY_ENABLE:
+        s_store.tray_icon = !s_store.tray_icon;
+        tray_apply();
+        needMenuSync = 1;
+        break;
+
+    case IDC_CAP_MIN:
+        /* Minimising with the tray icon on means "get out of the way", so
+         * hide completely; the tray icon brings it back. Without the icon
+         * there would be no way back, so fall back to a normal minimise. */
+        if (s_store.tray_icon && Tray_Added())
+            ShowWindow(hwnd, SW_HIDE);
+        else
+            ShowWindow(hwnd, SW_MINIMIZE);
+        return;
+
+    case IDM_TRAY_SHOW:
+        ShowWindow(hwnd, IsIconic(hwnd) ? SW_RESTORE : SW_SHOW);
+        SetForegroundWindow(hwnd);
+        return;
+
+    case IDM_TRAY_HIDE:
+        widget_show(0);
+        return;
+
+    case IDM_AUTOSTART:
+        s_store.autostart = !s_store.autostart;
+        if (!Plat_AutostartSet(s_store.autostart)) {
+            /* Put the tick back: the registry refused, so the state did not
+             * actually change and showing it as changed would be a lie. */
+            s_store.autostart = !s_store.autostart;
+            s_ui.autostart = s_store.autostart;
+            MessageBoxA(hwnd, I18n_Str(IDS_AUTOSTART_FAIL), I18n_Str(IDS_APP_TITLE),
+                        MB_OK | MB_ICONWARNING);
+        }
+        needMenuSync = 1;
+        break;
+
+    case IDM_FIT_TO_SCREEN:
+        s_store.fit_to_screen = !s_store.fit_to_screen;
+        Metrics_SetFitToScreen(s_store.fit_to_screen);
+        Metrics_Init(hwnd);
+        Ui_ReloadStrings(hwnd);
+        if (s_widget != NULL)
+            Widget_Resize(s_widget);
+        needMenuSync = 1;
+        break;
+
+    case IDM_LANG_ZH:
+        apply_language(I18N_LANG_ZH);
+        needMenuSync = 1;
+        break;
+
+    case IDM_LANG_EN:
+        apply_language(I18N_LANG_EN);
+        needMenuSync = 1;
+        break;
+
     case IDM_WIN5:
         s_store.window_secs = 5;
         Stats_SetWindow(5);
@@ -342,6 +483,7 @@ static void on_close(HWND hwnd)
 static void on_destroy(HWND hwnd)
 {
     UNUSED(hwnd);
+    Tray_Remove(NULL);
     if (s_widget != NULL) {
         DestroyWindow(s_widget);
         s_widget = NULL;
@@ -349,11 +491,17 @@ static void on_destroy(HWND hwnd)
     PostQuitMessage(0);
 }
 
+static void on_tray(HWND hwnd, LPARAM lp)
+{
+    tray_callback(hwnd, lp);
+}
+
 static const UiHooks kHooks = {
     on_command,
     on_timer,
     on_close,
-    on_destroy
+    on_destroy,
+    on_tray
 };
 
 /* ------------------------------------------------------------------- life */
@@ -392,9 +540,30 @@ int App_Init(HINSTANCE hInst, const char *cmdLine)
             if (d >= 72 && d <= 480)
                 s_dpiOverride = d;
         }
+
+        /* --work=800x600 is a diagnostic: it does not change the screen, it
+         * only asks the fit logic what it would do on one that size. */
+        p = strstr(cmdLine, "--work=");
+        if (p != NULL) {
+            int w = 0, h = 0;
+            p += 7;
+            while (*p >= '0' && *p <= '9') { w = w * 10 + (*p - '0'); p++; }
+            if (*p == 'x' || *p == 'X') {
+                p++;
+                while (*p >= '0' && *p <= '9') { h = h * 10 + (*p - '0'); p++; }
+            }
+            if (w >= 160 && h >= 120) { s_store.work_w = w; s_store.work_h = h; }
+        }
     }
 
     Metrics_SetOverride(s_dpiOverride);
+    Metrics_SetWorkAreaOverride(s_store.work_w, s_store.work_h);
+    Metrics_SetFitToScreen(s_store.fit_to_screen);
+    I18n_Init(hInst, s_store.language);
+
+    /* The registry is the source of truth for autostart, not the ini: the user
+     * may have removed the entry by other means. */
+    s_store.autostart = Plat_AutostartEnabled();
 
     Stats_Init(s_store.window_secs, s_store.transmission);
     Stats_Restore(s_store.odo, s_store.trip, s_store.max_wpm);
@@ -433,6 +602,9 @@ int App_Init(HINSTANCE hInst, const char *cmdLine)
 
     if (s_store.always_on_top)
         apply_topmost();
+
+    if (s_store.tray_icon)
+        tray_apply();
 
     refresh();
 

@@ -27,6 +27,16 @@ void Widget_TextLeft(HDC hdc, int x, const RECT *box, const char *s,
 void Widget_TextCentered(HDC hdc, const RECT *box, const char *s,
                          HFONT f, COLORREF fg, COLORREF bg);
 
+/* Draws `text` with the mnemonic underlined; `&` marks it and is not shown,
+ * `&&` is a literal ampersand. Returns the width drawn. Handles both the
+ * English ("&File") and CJK (letter in brackets) caption styles. */
+int  Widget_TextMnemonic(HDC hdc, int x, int y, const char *text,
+                         HFONT f, COLORREF fg, COLORREF bg);
+
+/* Same string without its mnemonic markers, measured. Use this wherever a
+ * caption has to be laid out, so the box matches what gets drawn. */
+int  Widget_TextWidthMnemonic(HDC hdc, HFONT f, const char *s);
+
 /* ---- chrome ---- */
 void Widget_GroupBox(HDC hdc, const RECT *box, const char *caption);
 void Widget_PushButton(HDC hdc, const RECT *box, const char *caption, int pressed);

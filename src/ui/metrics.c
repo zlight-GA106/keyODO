@@ -15,10 +15,7 @@
 
 #include "keyodo_layout.h"
 #include "../platform/platform.h"
-
-/* The UI font face is SimSun (code page 936), written as escapes so this file
- * stays pure ASCII. */
-static const char kFaceUI[] = "\xcb\xce\xcc\xe5";
+#include "../i18n/i18n.h"
 
 Metrics M;
 
@@ -110,10 +107,14 @@ static void free_fonts(void)
 
 static void make_fonts(void)
 {
-    /* Pixel sizes at 100%, scaled. The face sizes match
-     * mockup/win98kit.py so the design render and the program agree. */
-    M.fUi      = make_font(kFaceUI, Metrics_S(12), FW_NORMAL, DEFAULT_QUALITY);
-    M.fUiBold  = make_font(kFaceUI, Metrics_S(12), FW_BOLD,   DEFAULT_QUALITY);
+    /* The UI face and its size follow the active language: Chinese needs a
+     * bitmap CJK face, English the classic Latin one. Everything else keeps
+     * the faces the reference render used. */
+    const char *face = I18n_UiFace();
+    int uiPx = Metrics_S(I18n_UiFontPx());
+
+    M.fUi      = make_font(face, uiPx, FW_NORMAL, DEFAULT_QUALITY);
+    M.fUiBold  = make_font(face, uiPx, FW_BOLD,   DEFAULT_QUALITY);
     M.fDial    = make_font("Arial", Metrics_S(11), FW_BOLD, NONANTIALIASED_QUALITY);
     M.fDrum    = make_font("Arial", Metrics_S(20), FW_BOLD, NONANTIALIASED_QUALITY);
     M.fReadout = make_font("Arial", Metrics_S(17), FW_BOLD, NONANTIALIASED_QUALITY);
@@ -211,10 +212,85 @@ static void compute(void)
     M.sbPane2X = Metrics_S(SB_PANE2_X);
 }
 
+/* ------------------------------------------------------- fit to screen --- */
+
+static int s_fit = 1;
+static int s_workOverrideW = 0;     /* diagnostics: pretend the screen is this */
+static int s_workOverrideH = 0;
+
+void Metrics_SetFitToScreen(int on)
+{
+    s_fit = on ? 1 : 0;
+}
+
+int Metrics_GetFitToScreen(void)
+{
+    return s_fit;
+}
+
+/* Pretend the work area is w x h. Lets the fit logic be exercised on a large
+ * monitor (--work=800x600 answers "would this fit on the old machine?"), and
+ * is how tools/feature_test.py verifies it. 0 restores the real work area. */
+void Metrics_SetWorkAreaOverride(int w, int h)
+{
+    s_workOverrideW = (w > 0) ? w : 0;
+    s_workOverrideH = (h > 0) ? h : 0;
+}
+
+static int work_area(HWND hwnd, RECT *out)
+{
+    if (s_workOverrideW > 0 && s_workOverrideH > 0) {
+        out->left = 0;
+        out->top = 0;
+        out->right = s_workOverrideW;
+        out->bottom = s_workOverrideH;
+        return 1;
+    }
+    return Plat_WorkArea(hwnd, out);
+}
+
+/* Shrinks the whole layout when the monitor cannot show it at its natural
+ * size -- a 200% scaling on a 1366x768 panel, or an 800x600 machine. Without
+ * this the window would simply be clamped to the work area and the bottom of
+ * the status bar would never be reachable.
+ *
+ * The window is proportional to the DPI (480x320 at 96), so the largest DPI
+ * that fits is exact arithmetic rather than a search. */
+static void apply_fit(HWND hwnd)
+{
+    RECT wa;
+    int maxW, maxH, dpiW, dpiH, fit;
+
+    if (!s_fit)
+        return;
+    if (!work_area(hwnd, &wa))
+        return;
+
+    maxW = wa.right - wa.left;
+    maxH = wa.bottom - wa.top;
+    /* Leave a margin so the frame is not flush against the screen edge. */
+    maxW -= maxW / 24;
+    maxH -= maxH / 24;
+    if (maxW < 160 || maxH < 120)
+        return;
+
+    dpiW = MulDiv(maxW, 96, KW_WIN_W);
+    dpiH = MulDiv(maxH, 96, KW_WIN_H);
+    fit = (dpiW < dpiH) ? dpiW : dpiH;
+    if (fit >= M.dpi)
+        return;
+    if (fit < 48)               /* never shrink below 50%: unreadable */
+        fit = 48;
+
+    M.dpi = fit;
+    compute();
+}
+
 int Metrics_Init(HWND hwnd)
 {
     M.dpi = query_dpi(hwnd);
     compute();
+    apply_fit(hwnd);
     free_fonts();
     make_fonts();
     return M.dpi;

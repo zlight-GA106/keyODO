@@ -23,6 +23,7 @@
 
 #include "keyodo_layout.h"
 #include "../common.h"
+#include "../i18n/i18n.h"
 #include "../platform/platform.h"
 #include "resource.h"
 
@@ -50,8 +51,7 @@ static int s_haveModel = 0;
 static void load_str(UINT id, char *buf, int cch)
 {
     buf[0] = 0;
-    if (s_inst != NULL)
-        LoadStringA(s_inst, id, buf, cch);
+    lstrcpynA(buf, I18n_Str(id), cch);
 }
 
 static void load_strings(void)
@@ -247,7 +247,7 @@ static int menubar_item_rect(HDC hdc, int index, RECT *out)
         return 0;
     x = Metrics_S(2);
     for (i = 0; i < MENU_ITEM_COUNT; i++) {
-        int w = Widget_TextWidth(hdc, M.fUi, S.menu[i]) + gap;
+        int w = Widget_TextWidthMnemonic(hdc, M.fUi, S.menu[i]) + gap;
         if (i == index) {
             out->left = x;
             out->top = 0;
@@ -346,39 +346,13 @@ static void draw_menubar(HDC hdc)
     Theme_Fill(hdc, &rc, t->menu);
 
     for (i = 0; i < MENU_ITEM_COUNT; i++) {
-        const char *label = S.menu[i];
-        const char *lp;
         RECT cell;
-        int px, aw;
-
         if (!menubar_item_rect(hdc, i, &cell))
             break;
-
-        Widget_TextAt(hdc, cell.left + padX, Metrics_S(4), label,
-                      M.fUi, t->menutext, t->menu);
-
-        /* accelerator underline under the letter inside the parentheses */
-        px = cell.left + padX;
-        for (lp = label; *lp != 0 && *lp != '('; lp++)
-            ;
-        if (*lp == '(') {
-            char prefix[32];
-            char one[2];
-            int n = (int)(lp - label) + 1;
-            if (n > (int)sizeof(prefix) - 1) n = (int)sizeof(prefix) - 1;
-            memcpy(prefix, label, n);
-            prefix[n] = 0;
-            px += Widget_TextWidth(hdc, M.fUi, prefix);
-            aw = Metrics_S(6);
-            lp++;
-            if (*lp != 0 && *lp != ')') {
-                one[0] = *lp;
-                one[1] = 0;
-                aw = Widget_TextWidth(hdc, M.fUi, one);
-            }
-            Theme_HLineT(hdc, px, px + aw, M.menubar - Metrics_S(3),
-                         M.unit, t->menutext);
-        }
+        /* Widget_TextMnemonic strips the & and underlines the letter, which
+         * is what makes one string table serve both caption styles. */
+        Widget_TextMnemonic(hdc, cell.left + padX, Metrics_S(4), S.menu[i],
+                            M.fUi, t->menutext, t->menu);
     }
 }
 
@@ -515,11 +489,14 @@ static void paint_all(HDC hdc)
  * assembled fresh each time it opens and always reflects what is on screen.
  * ==================================================================== */
 
-#define MENU_MAX_ITEMS 12
+#define MENU_MAX_ITEMS 18
 
 static int build_file_menu(MenuItem *out)
 {
     int n = 0;
+    Menu_Item(&out[n++], IDM_AUTOSTART, IDS_MENU_AUTOSTART,
+              s_model.autostart ? MIF_CHECKED : 0);
+    Menu_Item(&out[n++], 0, 0, MIF_SEPARATOR);
     Menu_Item(&out[n++], IDM_EXIT, IDS_MENU_EXIT, 0);
     return n;
 }
@@ -551,6 +528,24 @@ static int build_view_menu(MenuItem *out)
     Menu_Item(&out[n++], 0, 0, MIF_SEPARATOR);
     Menu_Item(&out[n++], IDM_TOPMOST, IDS_MENU_TOPMOST,
               s_model.topmost ? MIF_CHECKED : 0);
+    Menu_Item(&out[n++], IDM_TRAY_ENABLE, IDS_MENU_TRAY,
+              s_model.tray ? MIF_CHECKED : 0);
+    Menu_Item(&out[n++], 0, 0, MIF_SEPARATOR);
+    Menu_Item(&out[n++], IDM_FIT_TO_SCREEN, IDS_MENU_FIT,
+              s_model.fit ? MIF_CHECKED : 0);
+    Menu_Item(&out[n++], 0, 0, MIF_SEPARATOR);
+    /* language: one radio per language, built from the language table so a new
+     * language needs no change here */
+    {
+        static const UINT kLangCmd[I18N_LANG_COUNT] = { IDM_LANG_ZH, IDM_LANG_EN };
+        int l;
+        for (l = 0; l < I18N_LANG_COUNT; l++) {
+            Menu_Item(&out[n], kLangCmd[l],
+                      (l == I18N_LANG_EN) ? IDS_LANG_EN : IDS_LANG_ZH,
+                      (s_model.language == l) ? (MIF_CHECKED | MIF_RADIO) : 0);
+            n++;
+        }
+    }
     return n;
 }
 
@@ -683,6 +678,11 @@ static LRESULT CALLBACK Ui_WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     }
 
+    case UIWM_TRAY:
+        if (s_hooks != NULL && s_hooks->on_tray != NULL)
+            s_hooks->on_tray(hwnd, lp);
+        return 0;
+
     case UIWM_DPI_REFRESH: {
         Metrics_Init(hwnd);
         free_backbuffer();
@@ -749,8 +749,14 @@ static LRESULT CALLBACK Ui_WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         if (kind == 1 && id == was) {
             if (id == IDC_CAP_CLOSE)
                 PostMessage(hwnd, WM_CLOSE, 0, 0);
-            else if (id == IDC_CAP_MIN)
-                ShowWindow(hwnd, SW_MINIMIZE);
+            else if (id == IDC_CAP_MIN) {
+                /* The owner decides: with the tray icon on, minimising
+                 * hides the window to the notification area instead. */
+                if (s_hooks != NULL && s_hooks->on_command != NULL)
+                    s_hooks->on_command(hwnd, IDC_CAP_MIN);
+                else
+                    ShowWindow(hwnd, SW_MINIMIZE);
+            }
             else if (s_hooks != NULL && s_hooks->on_command != NULL)
                 s_hooks->on_command(hwnd, id);
         }
@@ -931,6 +937,22 @@ void Ui_InvalidateDynamic(HWND hwnd)
 {
     if (hwnd != NULL)
         InvalidateRect(hwnd, NULL, FALSE);
+}
+
+void Ui_ReloadStrings(HWND hwnd)
+{
+    if (s_inst == NULL)
+        return;
+    load_strings();
+    /* Text widths changed with the face, so the cached caption gradient and
+     * the back buffer both have to go. */
+    free_gradient();
+    free_backbuffer();
+    if (hwnd != NULL) {
+        SetWindowPos(hwnd, NULL, 0, 0, M.winW, M.winH,
+                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+        InvalidateRect(hwnd, NULL, FALSE);
+    }
 }
 
 void Ui_ShowAbout(HWND hwnd)

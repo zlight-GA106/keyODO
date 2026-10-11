@@ -43,6 +43,11 @@ void Storage_Defaults(StoreData *d)
     d->win_x = 0x7FFFFFFF;      /* sentinel: centre the window */
     d->win_y = 0x7FFFFFFF;
     d->dpi_override = 0;        /* follow the monitor */
+    d->work_w = 0;              /* use the real work area */
+    d->work_h = 0;
+    d->language = 0;            /* Chinese */
+    d->tray_icon = 1;           /* the tray icon is on by default */
+    d->fit_to_screen = 1;
     d->widget_shown = 0;
     d->widget_x = 0x7FFFFFFF;   /* sentinel: park at the default corner */
     d->widget_y = 0x7FFFFFFF;
@@ -119,6 +124,16 @@ int Storage_Load(StoreData *d)
     if (d->dpi_override != 0 && (d->dpi_override < 72 || d->dpi_override > 480))
         d->dpi_override = 0;
 
+    d->fit_to_screen  = read_int(SEC_WINDOW, "FitToScreen", 1) ? 1 : 0;
+    d->work_w         = read_int(SEC_WINDOW, "WorkWidth", 0);
+    d->work_h         = read_int(SEC_WINDOW, "WorkHeight", 0);
+    if (d->work_w < 0 || d->work_h < 0) { d->work_w = 0; d->work_h = 0; }
+
+    d->language       = read_int(SEC_VIEW, "Language", 0);
+    if (d->language < 0 || d->language > 1)
+        d->language = 0;
+    d->tray_icon      = read_int(SEC_VIEW, "TrayIcon", 1) ? 1 : 0;
+
     d->widget_shown   = read_int(SEC_WIDGET, "Shown", 0) ? 1 : 0;
     d->widget_x       = read_int(SEC_WIDGET, "X", 0x7FFFFFFF);
     d->widget_y       = read_int(SEC_WIDGET, "Y", 0x7FFFFFFF);
@@ -165,6 +180,17 @@ int Storage_Save(const StoreData *d)
 
     wsprintfA(buf, "%d", d->dpi_override);
     WritePrivateProfileStringA(SEC_WINDOW, "Dpi", buf, p);
+    wsprintfA(buf, "%d", d->fit_to_screen ? 1 : 0);
+    WritePrivateProfileStringA(SEC_WINDOW, "FitToScreen", buf, p);
+    wsprintfA(buf, "%d", d->work_w);
+    WritePrivateProfileStringA(SEC_WINDOW, "WorkWidth", buf, p);
+    wsprintfA(buf, "%d", d->work_h);
+    WritePrivateProfileStringA(SEC_WINDOW, "WorkHeight", buf, p);
+
+    wsprintfA(buf, "%d", d->language);
+    WritePrivateProfileStringA(SEC_VIEW, "Language", buf, p);
+    wsprintfA(buf, "%d", d->tray_icon ? 1 : 0);
+    WritePrivateProfileStringA(SEC_VIEW, "TrayIcon", buf, p);
 
     wsprintfA(buf, "%d", d->widget_shown ? 1 : 0);
     WritePrivateProfileStringA(SEC_WIDGET, "Shown", buf, p);

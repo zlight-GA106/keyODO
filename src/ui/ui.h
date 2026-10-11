@@ -19,6 +19,9 @@
  * Metrics is global, so both windows must rescale together. */
 #define UIWM_DPI_REFRESH (WM_APP + 1)
 
+/* Sent by the notification-area icon; lParam is the mouse message. */
+#define UIWM_TRAY        (WM_APP + 2)
+
 typedef struct UiModel {
     /* formatted read-outs */
     char odo[24];
@@ -45,6 +48,10 @@ typedef struct UiModel {
     int    widget;       /* detached desktop gauge is visible */
     int    topmost;      /* window is pinned above others      */
     int    window_secs;  /* statistics window: 5, 10 or 30     */
+    int    tray;         /* notification-area icon is shown    */
+    int    autostart;    /* registered under the HKCU Run key  */
+    int    fit;          /* shrink the layout on small screens */
+    int    language;     /* I18N_LANG_*                        */
 } UiModel;
 
 typedef struct UiHooks {
@@ -52,6 +59,9 @@ typedef struct UiHooks {
     void (*on_timer)(HWND hwnd);
     void (*on_close)(HWND hwnd);
     void (*on_destroy)(HWND hwnd);
+    /* A message arrived from the notification-area icon; lp is the mouse
+     * message that triggered it. */
+    void (*on_tray)(HWND hwnd, LPARAM lp);
 } UiHooks;
 
 /* Registers the window class and creates the window (not shown). */
@@ -61,6 +71,10 @@ void Ui_Destroy(HWND hwnd);
 /* Replaces the rendered snapshot and repaints what changed. */
 void Ui_SetModel(HWND hwnd, const UiModel *m);
 const UiModel *Ui_GetModel(void);
+
+/* Re-reads every string and re-lays out. Call after I18n_SetLang and a
+ * Metrics_Init, since the UI face changes with the language. */
+void Ui_ReloadStrings(HWND hwnd);
 
 /* Rebuilds the popup menu and ticks the current state. */
 

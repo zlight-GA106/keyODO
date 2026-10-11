@@ -22,6 +22,12 @@ typedef struct StoreData {
     int win_x, win_y;
 
     int dpi_override;      /* 0 = follow the monitor, else 96/120/144/192... */
+    int work_w, work_h;    /* diagnostics: pretend the work area is this */
+
+    int language;          /* I18N_LANG_*                                    */
+    int tray_icon;         /* notification-area icon shown                   */
+    int fit_to_screen;     /* shrink the layout when the screen is too small */
+    int autostart;         /* mirror of the HKCU Run entry (not authoritative) */
 
     /* detached desktop gauge */
     int widget_shown;

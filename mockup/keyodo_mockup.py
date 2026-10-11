@@ -208,13 +208,13 @@ def draw_menu_bar(d):
     x = l + 2
     for label, accel in MENU_ITEMS:
         TEXT.draw(d, (x + 6, t + 4), label, F_DIALOG, C["MENUTEXT"], bg=C["MENU"])
-        # accelerator underline, positioned from the real font's ink box
-        img, (ox, oy) = TEXT.render(label, F_DIALOG, C["MENUTEXT"], C["MENU"])
-        bb = TEXT.ink_bbox(img, C["MENU"])
+        # Accelerator underline. Positioned exactly as the program does it:
+        # one pixel above the bottom of the font's cell, so the rule hugs the
+        # letter instead of floating below it.
         prefix = label.split("(")[0] + "("
         px = x + 6 + TEXT.measure(prefix, F_DIALOG)[0]
         aw = TEXT.measure(accel, F_DIALOG)[0]
-        uy = min(t + 4 + bb[3] + 2, t + MENUBAR_H - 3)
+        uy = t + 4 + TEXT.measure(label, F_DIALOG)[1] - 1
         hl(d, px, px + aw, uy, C["MENUTEXT"])
         x += TEXT.measure(label, F_DIALOG)[0] + 12
 

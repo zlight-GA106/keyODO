@@ -39,4 +39,17 @@ int Plat_IsModernWindows(void);
  * dwmapi.dll dynamically, so it is a no-op on Windows 98 SE. */
 void Plat_ApplyFrameTweaks(HWND hwnd);
 
+/* Work area of the monitor `hwnd` is on, or of the primary monitor when hwnd
+ * is NULL. Returns 0 if the query failed and `out` was left untouched. */
+int Plat_WorkArea(HWND hwnd, RECT *out);
+
+/* ------------------------------------------------------- run at startup --
+ * A value under HKCU\...\CurrentVersion\Run. Per-user on purpose: installing
+ * to Program Files needs administrator rights, but turning autostart on must
+ * not prompt for elevation. */
+
+int Plat_AutostartEnabled(void);
+/* Returns 1 on success. Fails only if the registry is unwritable. */
+int Plat_AutostartSet(int on);
+
 #endif /* KEYODO_PLATFORM_H */

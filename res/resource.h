@@ -97,4 +97,90 @@
 #define IDS_MENU_WIN30          2091
 #define IDS_MENU_ABOUT          2092
 
+/* ------------------------------------------------------ second language --
+ * Every translated string has a twin exactly I18N_STRIDE above it, so adding
+ * a language is: one more block in the string table, one more set of defines
+ * here, and one more entry in src/i18n/i18n.c. No code outside i18n.c knows
+ * which language is active. */
+#define IDS_LANG_STRIDE         1000
+#define IDS_EN(id)              ((id) + IDS_LANG_STRIDE)
+
+#define IDS_LANG_ZH             2095   /* language names, shown in-language  */
+#define IDS_LANG_EN             2096
+
+#define IDS_APP_TITLE_EN        IDS_EN(IDS_APP_TITLE)
+
+#define IDS_MENU_FILE_EN        IDS_EN(IDS_MENU_FILE)
+#define IDS_MENU_EDIT_EN        IDS_EN(IDS_MENU_EDIT)
+#define IDS_MENU_VIEW_EN        IDS_EN(IDS_MENU_VIEW)
+#define IDS_MENU_STATS_EN       IDS_EN(IDS_MENU_STATS)
+#define IDS_MENU_HELP_EN        IDS_EN(IDS_MENU_HELP)
+
+#define IDS_GB_SPEED_EN         IDS_EN(IDS_GB_SPEED)
+#define IDS_GB_ODO_EN           IDS_EN(IDS_GB_ODO)
+#define IDS_GB_RATE_EN          IDS_EN(IDS_GB_RATE)
+
+#define IDS_LBL_ODO_EN          IDS_EN(IDS_LBL_ODO)
+#define IDS_LBL_TRIP_EN         IDS_EN(IDS_LBL_TRIP)
+#define IDS_LBL_KPM_EN          IDS_EN(IDS_LBL_KPM)
+#define IDS_LBL_MAX_EN          IDS_EN(IDS_LBL_MAX)
+
+#define IDS_BTN_TRIP_EN         IDS_EN(IDS_BTN_TRIP)
+#define IDS_BTN_PEAK_EN         IDS_EN(IDS_BTN_PEAK)
+
+#define IDS_STATUS_READY_EN     IDS_EN(IDS_STATUS_READY)
+#define IDS_ABOUT_TITLE_EN      IDS_EN(IDS_ABOUT_TITLE)
+#define IDS_ABOUT_TEXT_EN       IDS_EN(IDS_ABOUT_TEXT)
+
+#define IDS_WIDGET_MENU_MAIN_EN IDS_EN(IDS_WIDGET_MENU_MAIN)
+#define IDS_WIDGET_MENU_HIDE_EN IDS_EN(IDS_WIDGET_MENU_HIDE)
+#define IDS_WIDGET_MENU_EXIT_EN IDS_EN(IDS_WIDGET_MENU_EXIT)
+#define IDS_FMT_SCALE_EN        IDS_EN(IDS_FMT_SCALE)
+
+#define IDS_MENU_EXIT_EN        IDS_EN(IDS_MENU_EXIT)
+#define IDS_MENU_RESET_TRIP_EN  IDS_EN(IDS_MENU_RESET_TRIP)
+#define IDS_MENU_RESET_MAX_EN   IDS_EN(IDS_MENU_RESET_MAX)
+#define IDS_MENU_WIDGET_EN      IDS_EN(IDS_MENU_WIDGET)
+#define IDS_MENU_KPM_EN         IDS_EN(IDS_MENU_KPM)
+#define IDS_MENU_GEAR_EN        IDS_EN(IDS_MENU_GEAR)
+#define IDS_MENU_AUTO_EN        IDS_EN(IDS_MENU_AUTO)
+#define IDS_MENU_MANUAL_EN      IDS_EN(IDS_MENU_MANUAL)
+#define IDS_MENU_TOPMOST_EN     IDS_EN(IDS_MENU_TOPMOST)
+#define IDS_MENU_WIN5_EN        IDS_EN(IDS_MENU_WIN5)
+#define IDS_MENU_WIN10_EN       IDS_EN(IDS_MENU_WIN10)
+#define IDS_MENU_WIN30_EN       IDS_EN(IDS_MENU_WIN30)
+#define IDS_MENU_ABOUT_EN       IDS_EN(IDS_MENU_ABOUT)
+
+#define IDS_LANG_ZH_EN          IDS_EN(IDS_LANG_ZH)
+#define IDS_LANG_EN_EN          IDS_EN(IDS_LANG_EN)
+
+/* --------------------------------------------- tray and startup (0.2) --- */
+#define IDM_TRAY_SHOW           40050
+#define IDM_TRAY_ENABLE         40051   /* 显示托盘图标                       */
+#define IDM_AUTOSTART           40052   /* 开机自启                           */
+#define IDM_TRAY_HIDE           40053   /* hide the gauge, from the tray menu */
+#define IDM_LANG_ZH             40060
+#define IDM_LANG_EN             40061
+#define IDM_FIT_TO_SCREEN       40062   /* 适应屏幕（小屏自动缩小）           */
+
+#define IDS_MENU_TRAY           2100
+#define IDS_MENU_AUTOSTART      2101
+#define IDS_MENU_LANG           2102
+#define IDS_MENU_FIT            2103
+#define IDS_TRAY_TIP            2104    /* tray tooltip                       */
+#define IDS_MENU_TRAY_SHOW      2105
+#define IDS_MENU_TRAY_EXIT      2106
+#define IDS_MENU_TRAY_HIDE      2107
+#define IDS_AUTOSTART_FAIL      2108   /* registry write refused            */
+
+#define IDS_MENU_TRAY_EN        IDS_EN(IDS_MENU_TRAY)
+#define IDS_MENU_AUTOSTART_EN   IDS_EN(IDS_MENU_AUTOSTART)
+#define IDS_MENU_LANG_EN        IDS_EN(IDS_MENU_LANG)
+#define IDS_MENU_FIT_EN         IDS_EN(IDS_MENU_FIT)
+#define IDS_TRAY_TIP_EN         IDS_EN(IDS_TRAY_TIP)
+#define IDS_MENU_TRAY_SHOW_EN   IDS_EN(IDS_MENU_TRAY_SHOW)
+#define IDS_MENU_TRAY_EXIT_EN   IDS_EN(IDS_MENU_TRAY_EXIT)
+#define IDS_MENU_TRAY_HIDE_EN   IDS_EN(IDS_MENU_TRAY_HIDE)
+#define IDS_AUTOSTART_FAIL_EN   IDS_EN(IDS_AUTOSTART_FAIL)
+
 #endif /* KEYODO_RESOURCE_H */

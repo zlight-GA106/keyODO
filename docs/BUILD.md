@@ -103,7 +103,10 @@ src/
   main.c              进程入口、消息循环、加速键表
   app.c / app.h       组装层：唯一同时认识四个模块的地方
   common.c / .h       KeyU64 格式化等小工具
+  i18n/               当前语言 + 字符串查表（加语言只改这里和资源）
   platform/           唯一知道"现在跑在哪个 Windows 上"的模块
+    platform.c        DPI 感知、DPI 查询、工作区、Tick、设置路径
+    autostart.c       HKCU Run 键
   ui/                 界面：窗口、自绘 Win98 chrome、表盘、档位、控件
     ui.c              主窗口：窗口过程、布局、命中测试、菜单
     metrics.c / .h    把 96 DPI 规格按显示器 DPI 换算成实际尺寸与字体
@@ -112,6 +115,7 @@ src/
     gauge.c / .h      WPM 速度表（在自己的坐标系里绘制）
     gear.c / .h       档位读数与换挡显示
     menu.c / .h       自绘的 Win98 下拉菜单（不使用系统 TrackPopupMenu）
+    tray.c / .h       通知区域图标（用 NOTIFYICONDATA v1 布局，Win98 也认）
     widget.c / .h     桌面仪表：只含表盘的独立悬浮窗口
   stats/              按键统计：ODO / TRIP / WPM / KPM / MAX / 档位
   input/              输入后端
@@ -161,9 +165,26 @@ python tools\installer_ui_test.py
 python tools\menu_test.py
 python tools\menu_capture.py
 
+:: 语言切换、托盘/最小化、开机自启注册表、适应屏幕
+python tools\feature_test.py
+
+:: 确认某台老机器上的尺寸（只影响「适应屏幕」的计算）
+build\keyodo.exe --work=800x600 --dpi=192
+
 :: 独立验证 Raw Input 在本机是否真的能收到注入按键
 python tools\probe_rawinput.py
 ```
+
+### 加一种语言
+
+1. `res/keyodo.rc`：照抄英文那段 `STRINGTABLE`，ID 用 `IDS_EN(...)` 再加一个 `IDS_LANG_STRIDE`
+2. `res/resource.h`：加一组 `IDS_EN2(...)` 之类的定义（或者干脆把 stride 改成倍数）
+3. `src/i18n/i18n.c`：`kLangs[]` 加一行（字体名 + 96 DPI 下的字号），`I18N_LANG_COUNT` 加一
+
+`src/i18n/i18n.c` 查表的规则是「找不到翻译就回落到中文」，所以翻译做一半也不会出现空标签。
+
+字体是跟着语言走的（中文宋体 / 英文 MS Sans Serif），因为两种文字的最优界面字体本来就
+不是同一个；`I18n_UiFace()` 和 `I18n_UiFontPx()` 是唯一的接口。
 
 ### 哪些测试需要「有桌面的会话」
 

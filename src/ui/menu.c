@@ -16,11 +16,12 @@
 #include "metrics.h"
 
 #include "../common.h"
+#include "../i18n/i18n.h"
 
 #include <string.h>
 
 #define MENU_CLASS "KeyODO_Menu"
-#define MENU_MAX   16
+#define MENU_MAX   18
 
 /* Classic tick mark, 8 columns by 7 rows, MSB is the leftmost column. */
 static const unsigned short kTick[7] = {
@@ -73,7 +74,7 @@ static void load(UINT id, char *buf, int cch)
 {
     buf[0] = 0;
     if (id != 0)
-        LoadStringA(s_inst, id, buf, cch);
+        lstrcpynA(buf, I18n_Str(id), cch);
 }
 
 /* Splits "label\tshortcut" in place. */
@@ -86,50 +87,6 @@ static void split_tab(char *s, char *accel, int accelCch)
     if (*tab == '\t') {
         *tab = 0;
         lstrcpynA(accel, tab + 1, accelCch);
-    }
-}
-
-/* Draws `text` with the mnemonic underlined; `&` marks it and is not shown. */
-static void draw_text(HDC hdc, int x, int y, const char *text,
-                      COLORREF fg, COLORREF bg)
-{
-    char clean[64];
-    int i = 0, mnemonic = -1;
-    const char *p;
-    HGDIOBJ old;
-    SIZE sz;
-
-    for (p = text; *p != 0 && i < (int)sizeof(clean) - 1; p++) {
-        if (*p == '&') {
-            if (p[1] == '&') {          /* escaped ampersand */
-                clean[i++] = '&';
-                p++;
-                continue;
-            }
-            mnemonic = i;
-            continue;
-        }
-        clean[i++] = *p;
-    }
-    clean[i] = 0;
-
-    old = SelectObject(hdc, M.fUi);
-    SetBkMode(hdc, OPAQUE);
-    SetBkColor(hdc, bg);
-    SetTextColor(hdc, fg);
-    TextOutA(hdc, x, y, clean, i);
-    sz.cx = 0; sz.cy = 0;
-    GetTextExtentPoint32A(hdc, clean, i, &sz);
-    SelectObject(hdc, old);
-
-    if (mnemonic >= 0 && mnemonic < i) {
-        SIZE pre, one;
-        char mc[2];
-        mc[0] = clean[mnemonic];
-        mc[1] = 0;
-        GetTextExtentPoint32A(hdc, clean, mnemonic, &pre);
-        GetTextExtentPoint32A(hdc, mc, 1, &one);
-        Theme_HLine(hdc, x + pre.cx, x + pre.cx + one.cx, y + sz.cy - 1, fg);
     }
 }
 
@@ -284,10 +241,11 @@ static void paint(HDC hdc)
         {
             int y = ir.top + (b->h - s_textH) / 2;
             x = s_labelX;
-            draw_text(hdc, x, y, b->label, fg, bg);
+            Widget_TextMnemonic(hdc, x, y, b->label, M.fUi, fg, bg);
             if (b->accel[0]) {
                 int aw = Widget_TextWidth(hdc, M.fUi, b->accel);
-                draw_text(hdc, s_w - Metrics_S(12) - aw, y, b->accel, fg, bg);
+                Widget_TextMnemonic(hdc, s_w - Metrics_S(12) - aw, y,
+                                    b->accel, M.fUi, fg, bg);
             }
         }
     }

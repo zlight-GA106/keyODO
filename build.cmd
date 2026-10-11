@@ -30,9 +30,9 @@ if /i "%TARGET%"=="clean" (
 )
 
 rem ---------------------------------------------------------------- sources
-set "SRCS=src\main.c src\app.c src\common.c src\platform\platform.c src\ui\ui.c src\ui\theme.c src\ui\widgets.c src\ui\menu.c src\ui\gauge.c src\ui\gear.c src\ui\metrics.c src\ui\widget.c src\stats\stats.c src\input\input.c src\input\input_raw.c src\input\input_hook.c src\storage\storage.c"
+set "SRCS=src\main.c src\app.c src\common.c src\i18n\i18n.c src\platform\platform.c src\platform\autostart.c src\ui\ui.c src\ui\theme.c src\ui\widgets.c src\ui\menu.c src\ui\gauge.c src\ui\gear.c src\ui\metrics.c src\ui\tray.c src\ui\widget.c src\stats\stats.c src\input\input.c src\input\input_raw.c src\input\input_hook.c src\storage\storage.c"
 
-set "OBJS=%OUTDIR%\main.obj %OUTDIR%\app.obj %OUTDIR%\common.obj %OUTDIR%\platform.obj %OUTDIR%\ui.obj %OUTDIR%\theme.obj %OUTDIR%\widgets.obj %OUTDIR%\menu.obj %OUTDIR%\gauge.obj %OUTDIR%\gear.obj %OUTDIR%\metrics.obj %OUTDIR%\widget.obj %OUTDIR%\stats.obj %OUTDIR%\input.obj %OUTDIR%\input_raw.obj %OUTDIR%\input_hook.obj %OUTDIR%\storage.obj"
+set "OBJS=%OUTDIR%\main.obj %OUTDIR%\app.obj %OUTDIR%\common.obj %OUTDIR%\i18n.obj %OUTDIR%\platform.obj %OUTDIR%\autostart.obj %OUTDIR%\ui.obj %OUTDIR%\theme.obj %OUTDIR%\widgets.obj %OUTDIR%\menu.obj %OUTDIR%\gauge.obj %OUTDIR%\gear.obj %OUTDIR%\metrics.obj %OUTDIR%\tray.obj %OUTDIR%\widget.obj %OUTDIR%\stats.obj %OUTDIR%\input.obj %OUTDIR%\input_raw.obj %OUTDIR%\input_hook.obj %OUTDIR%\storage.obj"
 
 if not exist "%OUTDIR%" mkdir "%OUTDIR%"
 if not exist "%DISTDIR%" mkdir "%DISTDIR%"
@@ -89,7 +89,7 @@ rem No manifest is embedded on purpose: without a comctl32 v6 manifest the
 rem program keeps the classic, unthemed control look on modern Windows too.
 link /nologo /SUBSYSTEM:WINDOWS /MACHINE:X86 /INCREMENTAL:NO ^
      /OUT:"%OUTDIR%\keyodo.exe" %OBJS% "%OUTDIR%\keyodo.res" ^
-     user32.lib gdi32.lib shell32.lib
+     user32.lib gdi32.lib shell32.lib advapi32.lib
 if errorlevel 1 (
     echo ERROR: link failed.
     exit /b 1

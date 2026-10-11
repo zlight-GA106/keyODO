@@ -35,16 +35,93 @@ BEGIN
     "T",            IDM_TM_MANUAL,      VIRTKEY, CONTROL
 END
 
+/* ===========================================================================
+ * English. Every id here is exactly IDS_LANG_STRIDE above its Chinese twin;
+ * src/i18n/i18n.c looks up id + stride when English is active and falls back to
+ * the Chinese entry when a translation is missing. Adding another language is
+ * one more block like this.
+ * ======================================================================== */
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_LANG_ZH_EN            "中文"
+    IDS_LANG_EN_EN            "English"
+
+    IDS_APP_TITLE_EN          "KeyODO"
+
+    IDS_MENU_FILE_EN          "&File"
+    IDS_MENU_EDIT_EN          "&Edit"
+    IDS_MENU_VIEW_EN          "&View"
+    IDS_MENU_STATS_EN         "&Stats"
+    IDS_MENU_HELP_EN          "&Help"
+
+    IDS_GB_SPEED_EN           "Speed"
+    IDS_GB_ODO_EN             "Odometer"
+    IDS_GB_RATE_EN            "Rate"
+
+    IDS_LBL_ODO_EN            "ODO:"
+    IDS_LBL_TRIP_EN           "TRIP:"
+    IDS_LBL_KPM_EN            "KPM:"
+    IDS_LBL_MAX_EN            "MAX:"
+
+    IDS_BTN_TRIP_EN           "Clear(C)"
+    IDS_BTN_PEAK_EN           "Reset(R)"
+
+    IDS_STATUS_READY_EN       "Ready"
+    IDS_ABOUT_TITLE_EN        "About KeyODO"
+    IDS_ABOUT_TEXT_EN         "KeyODO 0.2\n\nKeyboard odometer: counts keystrokes, WPM and KPM.\n\nOnly key press counts are kept; nothing you type is recorded."
+
+    IDS_WIDGET_MENU_MAIN_EN   "Show main window(&M)"
+    IDS_WIDGET_MENU_HIDE_EN   "Hide desktop gauge(&H)"
+    IDS_WIDGET_MENU_EXIT_EN   "E&xit"
+    IDS_FMT_SCALE_EN          "%d DPI  %d%%"
+
+    IDS_MENU_EXIT_EN          "E&xit\tAlt+F4"
+    IDS_MENU_RESET_TRIP_EN    "Clear TRIP(&T)\tCtrl+T"
+    IDS_MENU_RESET_MAX_EN     "Reset peak WPM(&R)"
+    IDS_MENU_WIDGET_EN        "Desktop gauge(&W)"
+    IDS_MENU_KPM_EN           "Show KPM(&K)\tCtrl+K"
+    IDS_MENU_GEAR_EN          "Gear display(&G)"
+    IDS_MENU_AUTO_EN          "Automatic(&A)"
+    IDS_MENU_MANUAL_EN        "Manual(&T)"
+    IDS_MENU_TOPMOST_EN       "Always on top(&P)"
+    IDS_MENU_WIN5_EN          "Last 5 seconds(&5)"
+    IDS_MENU_WIN10_EN         "Last 10 seconds(&1)"
+    IDS_MENU_WIN30_EN         "Last 30 seconds(&3)"
+    IDS_MENU_ABOUT_EN         "About KeyODO(&A)..."
+
+    IDS_MENU_TRAY_EN          "Show tray icon(&T)"
+    IDS_MENU_AUTOSTART_EN     "Run at startup(&S)"
+    IDS_MENU_LANG_EN          "Language(&L)"
+    IDS_MENU_FIT_EN           "Fit to screen(&F)"
+    IDS_TRAY_TIP_EN           "KeyODO keyboard odometer"
+    IDS_MENU_TRAY_SHOW_EN     "Show main window(&M)"
+    IDS_MENU_TRAY_HIDE_EN     "Hide desktop gauge(&H)"
+    IDS_MENU_TRAY_EXIT_EN     "E&xit"
+    IDS_AUTOSTART_FAIL_EN     "Could not update the run-at-startup setting. Check that this user may write to the registry."
+    IDS_LANG_ZH            "中文"
+    IDS_LANG_EN            "English"
+
+    IDS_MENU_TRAY          "显示托盘图标(&T)"
+    IDS_MENU_AUTOSTART     "开机自启(&S)"
+    IDS_MENU_LANG          "语言(&L)"
+    IDS_MENU_FIT           "适应屏幕(&F)"
+    IDS_TRAY_TIP           "KeyODO 键盘里程表"
+    IDS_MENU_TRAY_SHOW     "显示主窗口(&M)"
+    IDS_MENU_TRAY_HIDE     "隐藏桌面仪表(&H)"
+    IDS_MENU_TRAY_EXIT     "退出(&X)"
+    IDS_AUTOSTART_FAIL     "无法写入开机自启设置。请检查当前用户对注册表的写入权限。"
+END
+
 /* ---------------------------------------------------------- string table */
 STRINGTABLE DISCARDABLE
 BEGIN
     IDS_APP_TITLE       "KeyODO"
 
-    IDS_MENU_FILE       "文件(F)"
-    IDS_MENU_EDIT       "编辑(E)"
-    IDS_MENU_VIEW       "查看(V)"
-    IDS_MENU_STATS      "统计(S)"
-    IDS_MENU_HELP       "帮助(H)"
+    IDS_MENU_FILE       "文件(&F)"
+    IDS_MENU_EDIT       "编辑(&E)"
+    IDS_MENU_VIEW       "查看(&V)"
+    IDS_MENU_STATS      "统计(&S)"
+    IDS_MENU_HELP       "帮助(&H)"
 
     IDS_GB_SPEED        "速度表"
     IDS_GB_ODO          "里程表"

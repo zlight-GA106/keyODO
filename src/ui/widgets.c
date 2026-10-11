@@ -199,6 +199,85 @@ void Widget_TextCentered(HDC hdc, const RECT *box, const char *s,
     Widget_TextAt(hdc, x, y, s, f, fg, bg);
 }
 
+/* Copies `text` without its mnemonic markers and reports where the mnemonic
+ * landed, so measuring and drawing always agree. */
+static void strip_mnemonic(const char *text, char *out, int cch, int *mnemonic)
+{
+    int i = 0;
+    const char *p;
+    *mnemonic = -1;
+    for (p = text; *p != 0 && i < cch - 1; p++) {
+        if (*p == '&') {
+            if (p[1] == '&') {
+                out[i++] = '&';
+                p++;
+                continue;
+            }
+            *mnemonic = i;
+            continue;
+        }
+        out[i++] = *p;
+    }
+    out[i] = 0;
+}
+
+int Widget_TextWidthMnemonic(HDC hdc, HFONT f, const char *s)
+{
+    char clean[128];
+    int mnemonic;
+    strip_mnemonic(s, clean, sizeof(clean), &mnemonic);
+    return Widget_TextWidth(hdc, f, clean);
+}
+
+/* Draws `text` with the mnemonic underlined. `&` marks the mnemonic and is not
+ * shown; `&&` is a literal ampersand. Returns the width drawn.
+ *
+ * Windows writes captions two ways -- "&File" in English, and the CJK
+ * convention that puts the letter in brackets -- and both mean the same thing,
+ * so both go through here and come out as the caption plus an underline. */
+int Widget_TextMnemonic(HDC hdc, int x, int y, const char *text,
+                        HFONT f, COLORREF fg, COLORREF bg)
+{
+    char clean[128];
+    int mnemonic = -1;
+    int i, hasMnemonic;
+    HGDIOBJ old;
+    SIZE sz, pre, one;
+    char mc[2];
+
+    strip_mnemonic(text, clean, sizeof(clean), &mnemonic);
+    i = lstrlenA(clean);
+    mc[0] = 0;
+    mc[1] = 0;
+    if (mnemonic >= 0 && mnemonic < i)
+        mc[0] = clean[mnemonic];
+
+    old = SelectObject(hdc, f);
+    SetBkMode(hdc, OPAQUE);
+    SetBkColor(hdc, bg);
+    SetTextColor(hdc, fg);
+    TextOutA(hdc, x, y, clean, i);
+    sz.cx = 0;
+    sz.cy = 0;
+    GetTextExtentPoint32A(hdc, clean, i, &sz);
+
+    /* Measure the mnemonic while OUR font is still selected. Measuring after
+     * the SelectObject below would use the DC's previous font and put the rule
+     * in the wrong place. */
+    pre.cx = 0; pre.cy = 0;
+    one.cx = 0; one.cy = 0;
+    hasMnemonic = (mnemonic >= 0 && mnemonic < i);
+    if (hasMnemonic) {
+        GetTextExtentPoint32A(hdc, clean, mnemonic, &pre);
+        GetTextExtentPoint32A(hdc, mc, 1, &one);
+    }
+    SelectObject(hdc, old);
+
+    if (hasMnemonic)
+        Theme_HLine(hdc, x + pre.cx, x + pre.cx + one.cx, y + sz.cy - 1, fg);
+    return sz.cx;
+}
+
 /* ======================================================================
  * chrome
  * ==================================================================== */

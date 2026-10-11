@@ -197,6 +197,7 @@ typedef struct KMonitorInfo {
 } KMonitorInfo;
 
 typedef HMONITOR (WINAPI *PFN_MonitorFromPoint)(POINT, DWORD);
+typedef HMONITOR (WINAPI *PFN_MonitorFromWindow)(HWND, DWORD);
 typedef BOOL (WINAPI *PFN_GetMonitorInfoA)(HMONITOR, KMonitorInfo *);
 
 static int work_area_for_point(const POINT *pt, RECT *out)
@@ -226,6 +227,42 @@ static int work_area_for_point(const POINT *pt, RECT *out)
             }
         }
     }
+    return 0;
+}
+
+int Plat_WorkArea(HWND hwnd, RECT *out)
+{
+    static PFN_MonitorFromWindow pFromWnd = NULL;
+    static PFN_GetMonitorInfoA pInfo = NULL;
+    static int tried = 0;
+    KMonitorInfo mi;
+
+    if (hwnd != NULL) {
+        if (!tried) {
+            HMODULE user32 = GetModuleHandleA("user32.dll");
+            if (user32 != NULL) {
+                pFromWnd = (PFN_MonitorFromWindow)GetProcAddress(user32, "MonitorFromWindow");
+                pInfo    = (PFN_GetMonitorInfoA)GetProcAddress(user32, "GetMonitorInfoA");
+            }
+            tried = 1;
+        }
+        if (pFromWnd != NULL && pInfo != NULL) {
+            HMONITOR mon = pFromWnd(hwnd, KMONITOR_DEFAULTTONEAREST);
+            if (mon != NULL) {
+                mi.cbSize = sizeof(mi);
+                if (pInfo(mon, &mi)) {
+                    *out = mi.rcWork;
+                    return 1;
+                }
+            }
+        }
+    }
+    if (SystemParametersInfoA(SPI_GETWORKAREA, 0, out, 0))
+        return 1;
+    out->left = 0;
+    out->top = 0;
+    out->right = GetSystemMetrics(SM_CXSCREEN);
+    out->bottom = GetSystemMetrics(SM_CYSCREEN);
     return 0;
 }
 
