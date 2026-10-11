@@ -1,0 +1,27 @@
+KeyODO release information
+=========================
+
+Product      : KeyODO 0.1
+Built        : 2026-10-11 16:57:06 
+Built by     : the commit that contains this file (see git log release/)
+
+Toolchain
+  compiler    : MSVC 19.51 x86 (Visual Studio 18 Community, vcvars32)
+  target      : x86 (32-bit), /SUBSYSTEM:WINDOWS, /MT static CRT
+  machine     : 0x014C i386
+  subsystem   : 2 GUI
+  installer   : NSIS 3.04 (ANSI), MUI2, SimpChinese
+
+Static imports
+  KERNEL32, USER32, GDI32, SHELL32, ADVAPI32
+  no comctl32 v6 manifest, no VC runtime DLL dependency
+
+SHA-256
+  c6056ceb1d78f596626cfcf4d555f8a18a5a28e50da057400da5180971667a3a  keyodo.exe
+  30f659b26a3dd1b880d3f5316fe676e679e5fc2588bd6576d1385350de75b189  KeyODO_Setup.exe
+
+Notes
+  * keyodo.exe runs standalone; it writes only %APPDATA%\KeyODO\keyodo.ini
+  * KeyODO_Setup.exe requires administrator rights (Program Files + uninstall info)
+  * the source is Windows 98 SE compatible, but these binaries are not: the
+    modern CRT pulls in kernel imports that 98 SE does not have. See docs/BUILD.md.

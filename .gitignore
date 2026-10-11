@@ -24,3 +24,12 @@ assets/logs/
 *.user
 Thumbs.db
 desktop.ini
+
+# ---- checked-in build output ----------------------------------------------
+# release/ holds the built program and installer, kept in the repository on
+# purpose so a binary can be fetched without a toolchain. Everything else
+# under build/ and dist/ stays out.
+!release/
+!release/*.exe
+!release/*.txt
+!release/*.md
