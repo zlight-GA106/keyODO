@@ -33,6 +33,9 @@
 #define IDM_TM_AUTO             40022
 #define IDM_TM_MANUAL           40023
 #define IDM_TOPMOST             40024
+#define IDM_SHOW_WIDGET         40025    /* detached desktop gauge          */
+#define IDM_WIDGET_HIDE         40026    /* from the widget's own menu      */
+#define IDM_WIDGET_SHOWMAIN     40027    /* bring the main window forward   */
 
 #define IDM_WIN5                40030
 #define IDM_WIN10               40031
@@ -71,5 +74,10 @@
 #define IDS_STATUS_READY        2050
 #define IDS_ABOUT_TITLE         2060
 #define IDS_ABOUT_TEXT          2061
+
+#define IDS_WIDGET_MENU_MAIN    2070
+#define IDS_WIDGET_MENU_HIDE    2071
+#define IDS_WIDGET_MENU_EXIT    2072
+#define IDS_FMT_SCALE           2073   /* "%d DPI  %d%%" */
 
 #endif /* KEYODO_RESOURCE_H */

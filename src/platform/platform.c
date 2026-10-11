@@ -24,6 +24,8 @@
 /* ---------------------------------------------------------------- modern? */
 
 typedef BOOL (WINAPI *PFN_SetProcessDPIAware)(void);
+typedef BOOL (WINAPI *PFN_SetProcessDpiAwarenessContext)(void *);
+typedef HRESULT (WINAPI *PFN_SetProcessDpiAwareness)(int);
 typedef HRESULT (WINAPI *PFN_DwmSetWindowAttribute)(HWND, DWORD, LPCVOID, DWORD);
 
 #define DWMWA_WINDOW_CORNER_PREFERENCE 33
@@ -37,8 +39,10 @@ int Plat_IsModernWindows(void)
         OSVERSIONINFOA vi;
         ZeroMemory(&vi, sizeof(vi));
         vi.dwOSVersionInfoSize = sizeof(vi);
-        /* GetVersionExA is deprecated for manifests but still works and is the
-         * only version call Windows 98 SE understands. */
+        /* GetVersionExA is deprecated for manifested applications on modern
+         * Windows, but it is the only version call Windows 98 SE understands.
+         * The answer is only used to decide whether modern-only tweaks are
+         * worth attempting. */
         s_modern = 0;
         if (GetVersionExA(&vi)) {
             if (vi.dwPlatformId == VER_PLATFORM_WIN32_NT && vi.dwMajorVersion >= 6)
@@ -48,20 +52,51 @@ int Plat_IsModernWindows(void)
     return s_modern;
 }
 
+/* Ask for the best DPI awareness this Windows offers, in descending order.
+ * Every step is resolved dynamically, so on Windows 98 SE -- which has none of
+ * these -- the whole routine is a no-op and the system stays at 96 DPI. */
+static void enable_dpi_awareness(void)
+{
+    HMODULE user32 = GetModuleHandleA("user32.dll");
+    HMODULE shcore;
+
+    if (user32 != NULL) {
+        PFN_SetProcessDpiAwarenessContext pCtx =
+            (PFN_SetProcessDpiAwarenessContext)GetProcAddress(
+                user32, "SetProcessDpiAwarenessContext");
+        if (pCtx != NULL) {
+            /* DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 == (HANDLE)-4 */
+            if (pCtx((void *)(INT_PTR)-4))
+                return;
+        }
+    }
+
+    shcore = LoadLibraryA("shcore.dll");
+    if (shcore != NULL) {
+        PFN_SetProcessDpiAwareness pAware =
+            (PFN_SetProcessDpiAwareness)GetProcAddress(
+                shcore, "SetProcessDpiAwareness");
+        if (pAware != NULL) {
+            /* PROCESS_PER_MONITOR_DPI_AWARE == 2 */
+            if (pAware(2) == 0) {
+                FreeLibrary(shcore);
+                return;
+            }
+        }
+        FreeLibrary(shcore);
+    }
+
+    if (user32 != NULL) {
+        PFN_SetProcessDPIAware pSys =
+            (PFN_SetProcessDPIAware)GetProcAddress(user32, "SetProcessDPIAware");
+        if (pSys != NULL)
+            pSys();
+    }
+}
+
 void Plat_Init(void)
 {
-    HMODULE user32;
-    PFN_SetProcessDPIAware pSetDpi;
-
-    /* 96 DPI is the design basis. Ask for DPI awareness so modern Windows does
-     * not bitmap-stretch the window; Windows 98 SE has no such API, so the
-     * lookup simply fails there and we carry on at 96 DPI anyway. */
-    user32 = GetModuleHandleA("user32.dll");
-    if (user32 != NULL) {
-        pSetDpi = (PFN_SetProcessDPIAware)GetProcAddress(user32, "SetProcessDPIAware");
-        if (pSetDpi != NULL)
-            pSetDpi();
-    }
+    enable_dpi_awareness();
 }
 
 /* ------------------------------------------------------------------ clock */
@@ -145,25 +180,88 @@ void Plat_EnsureParentDir(const char *path)
 
 /* ---------------------------------------------------------------- display */
 
+/* Multi-monitor placement.
+ *
+ * MonitorFromPoint / GetMonitorInfoA exist on Windows 98 SE and later, but the
+ * headers only declare them above a WINVER threshold, and this project must
+ * also compile with the Windows 98 era SDK. Declaring the two prototypes and
+ * the struct locally keeps the source independent of that threshold.
+ */
+#define KMONITOR_DEFAULTTONEAREST 2
+
+typedef struct KMonitorInfo {
+    DWORD cbSize;
+    RECT  rcMonitor;
+    RECT  rcWork;
+    DWORD dwFlags;
+} KMonitorInfo;
+
+typedef HMONITOR (WINAPI *PFN_MonitorFromPoint)(POINT, DWORD);
+typedef BOOL (WINAPI *PFN_GetMonitorInfoA)(HMONITOR, KMonitorInfo *);
+
+static int work_area_for_point(const POINT *pt, RECT *out)
+{
+    static PFN_MonitorFromPoint pFromPt = NULL;
+    static PFN_GetMonitorInfoA pInfo = NULL;
+    static int tried = 0;
+    HMONITOR mon;
+    KMonitorInfo mi;
+
+    if (!tried) {
+        HMODULE user32 = GetModuleHandleA("user32.dll");
+        if (user32 != NULL) {
+            pFromPt = (PFN_MonitorFromPoint)GetProcAddress(user32, "MonitorFromPoint");
+            pInfo   = (PFN_GetMonitorInfoA)GetProcAddress(user32, "GetMonitorInfoA");
+        }
+        tried = 1;
+    }
+
+    if (pFromPt != NULL && pInfo != NULL) {
+        mon = pFromPt(*pt, KMONITOR_DEFAULTTONEAREST);
+        if (mon != NULL) {
+            mi.cbSize = sizeof(mi);
+            if (pInfo(mon, &mi)) {
+                *out = mi.rcWork;
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
 void Plat_ClampToWorkArea(int *x, int *y, int cx, int cy)
 {
     RECT wa;
-    int w = GetSystemMetrics(SM_CXSCREEN);
-    int h = GetSystemMetrics(SM_CYSCREEN);
+    POINT pt;
 
-    if (SystemParametersInfoA(SPI_GETWORKAREA, 0, &wa, 0)) {
-        w = wa.right;
-        h = wa.bottom;
-        if (*x < wa.left) *x = wa.left;
-        if (*y < wa.top)  *y = wa.top;
-    } else {
-        if (*x < 0) *x = 0;
-        if (*y < 0) *y = 0;
+    if (x == NULL || y == NULL)
+        return;
+
+    pt.x = *x;
+    pt.y = *y;
+    /* MonitorFromPoint needs a real coordinate; the 0x7FFFFFFF sentinel used
+     * for "not saved yet" would miss every monitor, so fall back to the
+     * primary work area in that case. */
+    if (*x == 0x7FFFFFFF || *y == 0x7FFFFFFF) {
+        pt.x = 0;
+        pt.y = 0;
+        if (!work_area_for_point(&pt, &wa) &&
+            !SystemParametersInfoA(SPI_GETWORKAREA, 0, &wa, 0)) {
+            wa.left = 0; wa.top = 0;
+            wa.right = GetSystemMetrics(SM_CXSCREEN);
+            wa.bottom = GetSystemMetrics(SM_CYSCREEN);
+        }
+    } else if (!work_area_for_point(&pt, &wa) &&
+               !SystemParametersInfoA(SPI_GETWORKAREA, 0, &wa, 0)) {
+        wa.left = 0; wa.top = 0;
+        wa.right = GetSystemMetrics(SM_CXSCREEN);
+        wa.bottom = GetSystemMetrics(SM_CYSCREEN);
     }
-    if (*x + cx > w) *x = w - cx;
-    if (*y + cy > h) *y = h - cy;
-    if (*x < 0) *x = 0;
-    if (*y < 0) *y = 0;
+
+    if (*x + cx > wa.right)  *x = wa.right - cx;
+    if (*y + cy > wa.bottom) *y = wa.bottom - cy;
+    if (*x < wa.left) *x = wa.left;
+    if (*y < wa.top)  *y = wa.top;
 }
 
 /* -------------------------------------------------- modern-only niceties */

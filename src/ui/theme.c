@@ -1,5 +1,5 @@
 /* ===========================================================================
- * theme.c -- pinned Windows 98 SE palette, measured 3D edge recipes, fonts.
+ * theme.c -- pinned Windows 98 SE palette, measured 3D edge recipes.
  *
  * The edge recipes below are not guesswork. tools/probe_gdi_edge.py rendered
  * the real user32!DrawEdge / DrawFrameControl primitives into a DIB and read
@@ -10,11 +10,11 @@
  *       bottom : y=21 COLOR_3DDKSHADOW  y=20 COLOR_BTNSHADOW
  *
  * so EDGE_RAISED is light/dkshadow on the outside and hilight/shadow inside.
+ *
+ * Fonts live in metrics.c because they scale with the monitor DPI.
  * ======================================================================== */
 
 #include "theme.h"
-
-#include <string.h>
 
 /* ------------------------------------------------------------------ inks */
 
@@ -53,19 +53,6 @@ const unsigned short kGlyphMin[14] = {
     0x0000, 0x0000, 0x0FC0, 0x0FC0, 0x0000, 0x0000, 0x0000
 };
 
-/* ---------------------------------------------------------------- fonts */
-
-/* SimSun ("Song Ti") in code page 936. Written as escapes so this source file
- * stays pure ASCII and cannot be corrupted by an editor re-encoding it. */
-static const char kFaceUI[] = "\xcb\xce\xcc\xe5";
-
-static HFONT make_font(const char *face, int px, int weight, BYTE quality)
-{
-    return CreateFontA(-px, 0, 0, 0, weight, FALSE, FALSE, FALSE,
-                       DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                       quality, DEFAULT_PITCH, face);
-}
-
 void Theme_Init(void)
 {
     Theme *t = &g_theme;
@@ -90,29 +77,6 @@ void Theme_Init(void)
     t->highlight      = INK_HIGHLIGHT;
     t->highlight_text = INK_HILITETEXT;
     t->red            = INK_RED;
-
-    /* Sizes mirror mockup/win98kit.py exactly: the design render and the
-     * program must not drift apart. */
-    t->f_ui       = make_font(kFaceUI, 12, FW_NORMAL, DEFAULT_QUALITY);
-    t->f_ui_bold  = make_font(kFaceUI, 12, FW_BOLD,   DEFAULT_QUALITY);
-    t->f_dial     = make_font("Arial", 11, FW_BOLD, NONANTIALIASED_QUALITY);
-    t->f_drum     = make_font("Arial", 20, FW_BOLD, NONANTIALIASED_QUALITY);
-    t->f_readout  = make_font("Arial", 17, FW_BOLD, NONANTIALIASED_QUALITY);
-    t->f_huge     = make_font("Arial", 29, FW_BOLD, ANTIALIASED_QUALITY);
-    t->f_gear_sm  = make_font("Arial", 20, FW_BOLD, NONANTIALIASED_QUALITY);
-    t->f_gate     = make_font("Arial", 14, FW_BOLD, NONANTIALIASED_QUALITY);
-}
-
-void Theme_Done(void)
-{
-    HFONT *fonts = &g_theme.f_ui;
-    int i;
-    for (i = 0; i < 8; i++) {
-        if (fonts[i] != NULL) {
-            DeleteObject(fonts[i]);
-            fonts[i] = NULL;
-        }
-    }
 }
 
 /* --------------------------------------------------------- primitives */
@@ -152,6 +116,22 @@ void Theme_Rect1(HDC hdc, const RECT *rc, COLORREF c)
     Theme_VLine(hdc, rc->right - 1, rc->top, rc->bottom, c);
 }
 
+void Theme_HLineT(HDC hdc, int x0, int x1, int y, int t, COLORREF c)
+{
+    RECT r;
+    if (t < 1 || x1 <= x0) return;
+    r.left = x0; r.top = y; r.right = x1; r.bottom = y + t;
+    Theme_Fill(hdc, &r, c);
+}
+
+void Theme_VLineT(HDC hdc, int x, int y0, int y1, int t, COLORREF c)
+{
+    RECT r;
+    if (t < 1 || y1 <= y0) return;
+    r.left = x; r.top = y0; r.right = x + t; r.bottom = y1;
+    Theme_Fill(hdc, &r, c);
+}
+
 /* ------------------------------------------------------- edge recipes */
 
 typedef struct EdgeInk {
@@ -188,58 +168,101 @@ static void edge_ink(int kind, const Theme *t, EdgeInk *e)
     }
 }
 
+/* One band of `t` pixels hugging the given rectangle.
+ *
+ *   outer = 1 : the band sits on the rectangle edge, drawn with the top-left
+ *               inks on the top/left sides and the bottom-right inks below
+ *   outer = 0 : the band sits `off` pixels inside, with the inner ring inks
+ *
+ * At bevel 2 the two calls reproduce the measured 96-DPI shape exactly:
+ * one 1 px outer ring and one 1 px inner ring.
+ */
+static void bevel_band(HDC hdc, const RECT *rc, int t, int off,
+                       COLORREF tl, COLORREF br)
+{
+    RECT r;
+    int l = rc->left + off, tp = rc->top + off;
+    int rr = rc->right - off, b = rc->bottom - off;
+
+    if (t < 1 || rr <= l || b <= tp)
+        return;
+
+    r.left = l;       r.top = tp;      r.right = rr;      r.bottom = tp + t;
+    Theme_Fill(hdc, &r, tl);
+    r.left = l;       r.top = tp;      r.right = l + t;   r.bottom = b;
+    Theme_Fill(hdc, &r, tl);
+    r.left = l;       r.top = b - t;   r.right = rr;      r.bottom = b;
+    Theme_Fill(hdc, &r, br);
+    r.left = rr - t;  r.top = tp;      r.right = rr;      r.bottom = b;
+    Theme_Fill(hdc, &r, br);
+}
+
+void Theme_Bevel(HDC hdc, const RECT *rc,
+                 COLORREF tlOuter, COLORREF tlInner,
+                 COLORREF brInner, COLORREF brOuter, int bevel)
+{
+    int tOuter, tInner;
+
+    if (rc->right <= rc->left || rc->bottom <= rc->top)
+        return;
+    if (bevel < 2) {
+        bevel_band(hdc, rc, 1, 0, tlOuter, brOuter);
+        return;
+    }
+    tOuter = bevel / 2;
+    tInner = bevel - tOuter;
+    bevel_band(hdc, rc, tOuter, 0, tlOuter, brOuter);
+    bevel_band(hdc, rc, tInner, tOuter, tlInner, brInner);
+}
+
 void Theme_DrawEdge(HDC hdc, const RECT *rc, int kind, int thickness)
 {
     EdgeInk e;
-    int l = rc->left, t = rc->top;
-    int r = rc->right - 1, b = rc->bottom - 1;
 
     if (rc->right <= rc->left || rc->bottom <= rc->top)
         return;
     edge_ink(kind, &g_theme, &e);
 
     if (thickness <= 1) {
-        Theme_HLine(hdc, l, r + 1, t, e.tl0);
-        Theme_VLine(hdc, l, t, b + 1, e.tl0);
-        Theme_HLine(hdc, l, r + 1, b, e.br0);
-        Theme_VLine(hdc, r, t, b + 1, e.br0);
+        bevel_band(hdc, rc, 1, 0, e.tl0, e.br0);
         return;
     }
-
-    Theme_HLine(hdc, l, r + 1, t, e.tl0);
-    Theme_HLine(hdc, l, r + 1, t + 1, e.tl1);
-    Theme_VLine(hdc, l, t, b + 1, e.tl0);
-    Theme_VLine(hdc, l + 1, t, b + 1, e.tl1);
-
-    Theme_HLine(hdc, l, r + 1, b, e.br0);
-    Theme_HLine(hdc, l, r + 1, b - 1, e.br1);
-    Theme_VLine(hdc, r, t, b + 1, e.br0);
-    Theme_VLine(hdc, r - 1, t, b + 1, e.br1);
+    Theme_Bevel(hdc, rc, e.tl0, e.tl1, e.br1, e.br0, thickness);
 }
 
 void Theme_Panel(HDC hdc, const RECT *rc, COLORREF fill, int kind, int thickness)
 {
     RECT in = *rc;
+    int t = (thickness < 1) ? 1 : thickness;
     Theme_DrawEdge(hdc, rc, kind, thickness);
-    in.left += thickness;
-    in.top += thickness;
-    in.right -= thickness;
-    in.bottom -= thickness;
+    in.left += t;
+    in.top += t;
+    in.right -= t;
+    in.bottom -= t;
     Theme_Fill(hdc, &in, fill);
 }
 
 /* ------------------------------------------------------------ glyphs */
 
-void Theme_Glyph(HDC hdc, int x, int y, const unsigned short *mask, COLORREF ink)
+void Theme_Glyph(HDC hdc, int x, int y, const unsigned short *mask,
+                 COLORREF ink, int px)
 {
     int row, col;
+    if (px < 1)
+        px = 1;
     for (row = 0; row < 14; row++) {
         unsigned int bits = mask[row];
         if (bits == 0)
             continue;
         for (col = 0; col < 16; col++) {
-            if (bits & (0x8000u >> col))
-                SetPixelV(hdc, x + col, y + row, ink);
+            if (bits & (0x8000u >> col)) {
+                RECT r;
+                r.left = x + col * px;
+                r.top = y + row * px;
+                r.right = r.left + px;
+                r.bottom = r.top + px;
+                Theme_Fill(hdc, &r, ink);
+            }
         }
     }
 }

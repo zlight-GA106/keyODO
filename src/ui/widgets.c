@@ -8,10 +8,14 @@
  * (it returns the font cell height, not the ink). So the ink box is measured
  * once per (font, string) by drawing into a scratch 32bpp DIB and scanning it,
  * then cached -- the set of distinct strings is tiny.
+ *
+ * Every size goes through Metrics, so the same code paints a correctly scaled
+ * control at 100%, 125%, 150% and 200%.
  * ======================================================================== */
 
 #include "widgets.h"
 #include "theme.h"
+#include "metrics.h"
 
 #include <string.h>
 
@@ -19,8 +23,9 @@
  * ink metrics with cache
  * ==================================================================== */
 
-#define SCRATCH_W   320
-#define SCRATCH_H   64
+/* Big enough for the widest string at 200% scaling. */
+#define SCRATCH_W   768
+#define SCRATCH_H   192
 #define INK_CACHE   96
 #define INK_MAXLEN  32
 
@@ -86,15 +91,14 @@ static void ink_measure(HFONT f, const char *text, int *top, int *height)
     *height = 0;
 
     len = lstrlenA(text);
-    if (len <= 0 || len >= INK_MAXLEN)
-        len = (len >= INK_MAXLEN) ? INK_MAXLEN - 1 : 0;
-    if (len == 0)
+    if (len <= 0)
         return;
+    if (len >= INK_MAXLEN)
+        len = INK_MAXLEN - 1;
 
     if (!scratch_ready())
         return;
 
-    /* clear to white */
     all.left = 0; all.top = 0; all.right = SCRATCH_W; all.bottom = SCRATCH_H;
     white = (HBRUSH)GetStockObject(WHITE_BRUSH);
     FillRect(s_dc, &all, white);
@@ -204,31 +208,38 @@ void Widget_GroupBox(HDC hdc, const RECT *box, const char *caption)
     const Theme *t = &g_theme;
     int l = box->left, tp = box->top;
     int r = box->right - 1, b = box->bottom - 1;
-    int tw = Widget_TextWidth(hdc, t->f_ui, caption);
-    int gap0 = l + 9;
-    int gap1 = gap0 + tw + 4;
+    int u = M.unit;
+    int tw = Widget_TextWidth(hdc, M.fUi, caption);
+    int gap0 = l + Metrics_S(9);
+    int gap1 = gap0 + tw + Metrics_S(4);
 
     /* top edge, split by the caption gap */
-    Theme_HLine(hdc, l + 1, gap0, tp, t->shadow);
-    Theme_HLine(hdc, gap1, r, tp, t->shadow);
+    Theme_HLineT(hdc, l + u, gap0, tp, u, t->shadow);
+    Theme_HLineT(hdc, gap1, r, tp, u, t->shadow);
     /* left / bottom / right */
-    Theme_VLine(hdc, l, tp + 1, b + 1, t->shadow);
-    Theme_HLine(hdc, l + 1, r + 1, b, t->window);
-    Theme_VLine(hdc, r, tp + 1, b + 1, t->window);
+    Theme_VLineT(hdc, l, tp + u, b + 1, u, t->shadow);
+    Theme_HLineT(hdc, l + u, r + 1, b, u, t->window);
+    Theme_VLineT(hdc, r, tp + u, b + 1, u, t->window);
     /* corners */
-    SetPixelV(hdc, l, tp, t->shadow);
-    SetPixelV(hdc, r, tp, t->shadow);
-    SetPixelV(hdc, l, b, t->window);
-    SetPixelV(hdc, r, b, t->window);
+    {
+        RECT c1, c2, c3, c4;
+        c1.left = l; c1.top = tp; c1.right = l + u; c1.bottom = tp + u;
+        c2.left = r; c2.top = tp; c2.right = r + u; c2.bottom = tp + u;
+        c3.left = l; c3.top = b;  c3.right = l + u; c3.bottom = b + u;
+        c4.left = r; c4.top = b;  c4.right = r + u; c4.bottom = b + u;
+        Theme_Fill(hdc, &c1, t->shadow);
+        Theme_Fill(hdc, &c2, t->shadow);
+        Theme_Fill(hdc, &c3, t->window);
+        Theme_Fill(hdc, &c4, t->window);
+    }
 
-    Widget_TextAt(hdc, gap0 + 2, tp - 5, caption, t->f_ui, t->btntext, t->face);
+    Widget_TextAt(hdc, gap0 + Metrics_S(2), tp - Metrics_S(5), caption,
+                  M.fUi, t->btntext, t->face);
 }
 
 void Widget_PushButton(HDC hdc, const RECT *box, const char *caption, int pressed)
 {
     const Theme *t = &g_theme;
-    int l = box->left, tp = box->top;
-    int r = box->right - 1, b = box->bottom - 1;
     COLORREF o1, i1, i2, o2;
 
     if (pressed) {
@@ -237,25 +248,16 @@ void Widget_PushButton(HDC hdc, const RECT *box, const char *caption, int presse
         o1 = t->hilight;  i1 = t->light;  i2 = t->shadow; o2 = t->dkshadow;
     }
 
-    /* face */
     Theme_Fill(hdc, box, t->face);
-    /* two-pixel bevel: outer then inner, measured from DFCS_BUTTONPUSH */
-    Theme_HLine(hdc, l, r + 1, tp, o1);
-    Theme_HLine(hdc, l, r + 1, tp + 1, i1);
-    Theme_VLine(hdc, l, tp, b + 1, o1);
-    Theme_VLine(hdc, l + 1, tp, b + 1, i1);
-    Theme_HLine(hdc, l, r + 1, b, o2);
-    Theme_HLine(hdc, l, r + 1, b - 1, i2);
-    Theme_VLine(hdc, r, tp, b + 1, o2);
-    Theme_VLine(hdc, r - 1, tp, b + 1, i2);
+    Theme_Bevel(hdc, box, o1, i1, i2, o2, M.bevel);
 
     if (caption != NULL && caption[0] != 0) {
         RECT txt = *box;
         if (pressed) {
-            txt.left += 1;
-            txt.top += 1;
+            txt.left += M.unit;
+            txt.top += M.unit;
         }
-        Widget_TextCentered(hdc, &txt, caption, t->f_ui, t->btntext, t->face);
+        Widget_TextCentered(hdc, &txt, caption, M.fUi, t->btntext, t->face);
     }
 }
 
@@ -263,8 +265,6 @@ void Widget_CaptionButton(HDC hdc, const RECT *box,
                           const unsigned short *glyph, int pressed)
 {
     const Theme *t = &g_theme;
-    int l = box->left, tp = box->top;
-    int r = box->right - 1, b = box->bottom - 1;
     COLORREF o1, i1, i2, o2;
 
     if (pressed) {
@@ -274,16 +274,9 @@ void Widget_CaptionButton(HDC hdc, const RECT *box,
     }
 
     Theme_Fill(hdc, box, t->face);
-    Theme_HLine(hdc, l, r + 1, tp, o1);
-    Theme_HLine(hdc, l, r + 1, tp + 1, i1);
-    Theme_VLine(hdc, l, tp, b + 1, o1);
-    Theme_VLine(hdc, l + 1, tp, b + 1, i1);
-    Theme_HLine(hdc, l, r + 1, b, o2);
-    Theme_HLine(hdc, l, r + 1, b - 1, i2);
-    Theme_VLine(hdc, r, tp, b + 1, o2);
-    Theme_VLine(hdc, r - 1, tp, b + 1, i2);
+    Theme_Bevel(hdc, box, o1, i1, i2, o2, M.bevel);
 
-    Theme_Glyph(hdc, l, tp, glyph, t->btntext);
+    Theme_Glyph(hdc, box->left, box->top, glyph, t->btntext, M.unit);
 }
 
 /* ======================================================================
@@ -293,7 +286,7 @@ void Widget_CaptionButton(HDC hdc, const RECT *box,
 void Widget_Readout(HDC hdc, const RECT *box, const char *text, HFONT f)
 {
     const Theme *t = &g_theme;
-    Theme_Panel(hdc, box, t->window, TK_SUNKEN, 2);
+    Theme_Panel(hdc, box, t->window, TK_SUNKEN, M.bevel);
     Widget_TextCentered(hdc, box, text, f, t->windowtext, t->window);
 }
 
@@ -302,28 +295,30 @@ void Widget_Drum(HDC hdc, const RECT *box, const char *digits, int cellW)
     const Theme *t = &g_theme;
     int ix, iy, ih, i, n;
     RECT cell;
+    int u = M.unit;
+    int pad = Metrics_S(4);
 
-    Theme_Panel(hdc, box, t->window, TK_SUNKEN, 2);
+    Theme_Panel(hdc, box, t->window, TK_SUNKEN, M.bevel);
 
-    ix = box->left + 4;
-    iy = box->top + 4;
-    ih = (box->bottom - box->top) - 8;
+    ix = box->left + pad;
+    iy = box->top + pad;
+    ih = (box->bottom - box->top) - 2 * pad;
     n = lstrlenA(digits);
 
     for (i = 0; i < n; i++) {
         int cxx = ix + i * cellW;
         char one[2];
         if (i > 0) {
-            Theme_VLine(hdc, cxx, iy, iy + ih, t->light);
-            Theme_VLine(hdc, cxx + 1, iy, iy + ih, t->window);
+            Theme_VLineT(hdc, cxx, iy, iy + ih, u, t->light);
+            Theme_VLineT(hdc, cxx + u, iy, iy + ih, u, t->window);
         }
         one[0] = digits[i];
         one[1] = 0;
-        cell.left = cxx + 1;
+        cell.left = cxx + u;
         cell.top = iy;
         cell.right = cxx + cellW;
         cell.bottom = iy + ih;
-        Widget_TextCentered(hdc, &cell, one, t->f_drum, t->windowtext, t->window);
+        Widget_TextCentered(hdc, &cell, one, M.fDrum, t->windowtext, t->window);
     }
 }
 

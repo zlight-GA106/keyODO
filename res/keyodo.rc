@@ -38,6 +38,8 @@ BEGIN
     END
     POPUP "查看(&V)"
     BEGIN
+        MENUITEM "桌面仪表(&W)",            IDM_SHOW_WIDGET
+        MENUITEM SEPARATOR
         MENUITEM "显示 KPM(&K)\tCtrl+K",    IDM_SHOW_KPM
         MENUITEM "换挡显示(&G)",            IDM_SHOW_GEAR
         MENUITEM SEPARATOR
@@ -90,6 +92,10 @@ BEGIN
     IDS_STATUS_READY    "就绪"
     IDS_ABOUT_TITLE     "关于 KeyODO"
     IDS_ABOUT_TEXT      "KeyODO 0.1\n\n键盘里程表：统计按键次数、WPM 与 KPM。\n\n只记录按键次数，不记录任何输入内容。"
+    IDS_WIDGET_MENU_MAIN   "显示主窗口(&M)"
+    IDS_WIDGET_MENU_HIDE   "隐藏桌面仪表(&H)"
+    IDS_WIDGET_MENU_EXIT   "退出(&X)"
+    IDS_FMT_SCALE          "%d DPI  %d%%"
 END
 
 /* ---------------------------------------------------------------- version */

@@ -22,6 +22,7 @@
 #define SEC_TOTALS   "Totals"
 #define SEC_VIEW     "View"
 #define SEC_WINDOW   "Window"
+#define SEC_WIDGET   "Widget"
 #define SEC_INPUT    "Input"
 
 #define INI_NAME     "keyodo.ini"
@@ -41,6 +42,10 @@ void Storage_Defaults(StoreData *d)
     d->window_secs = 10;
     d->win_x = 0x7FFFFFFF;      /* sentinel: centre the window */
     d->win_y = 0x7FFFFFFF;
+    d->dpi_override = 0;        /* follow the monitor */
+    d->widget_shown = 0;
+    d->widget_x = 0x7FFFFFFF;   /* sentinel: park at the default corner */
+    d->widget_y = 0x7FFFFFFF;
     lstrcpynA(d->input_backend, "raw", sizeof(d->input_backend));
 }
 
@@ -110,6 +115,14 @@ int Storage_Load(StoreData *d)
     d->win_x          = read_int(SEC_WINDOW, "X", 0x7FFFFFFF);
     d->win_y          = read_int(SEC_WINDOW, "Y", 0x7FFFFFFF);
 
+    d->dpi_override   = read_int(SEC_WINDOW, "Dpi", 0);
+    if (d->dpi_override != 0 && (d->dpi_override < 72 || d->dpi_override > 480))
+        d->dpi_override = 0;
+
+    d->widget_shown   = read_int(SEC_WIDGET, "Shown", 0) ? 1 : 0;
+    d->widget_x       = read_int(SEC_WIDGET, "X", 0x7FFFFFFF);
+    d->widget_y       = read_int(SEC_WIDGET, "Y", 0x7FFFFFFF);
+
     read_str(SEC_INPUT, "Backend", "raw", d->input_backend,
              sizeof(d->input_backend));
     return 1;
@@ -149,6 +162,16 @@ int Storage_Save(const StoreData *d)
     WritePrivateProfileStringA(SEC_WINDOW, "X", buf, p);
     wsprintfA(buf, "%d", d->win_y);
     WritePrivateProfileStringA(SEC_WINDOW, "Y", buf, p);
+
+    wsprintfA(buf, "%d", d->dpi_override);
+    WritePrivateProfileStringA(SEC_WINDOW, "Dpi", buf, p);
+
+    wsprintfA(buf, "%d", d->widget_shown ? 1 : 0);
+    WritePrivateProfileStringA(SEC_WIDGET, "Shown", buf, p);
+    wsprintfA(buf, "%d", d->widget_x);
+    WritePrivateProfileStringA(SEC_WIDGET, "X", buf, p);
+    wsprintfA(buf, "%d", d->widget_y);
+    WritePrivateProfileStringA(SEC_WIDGET, "Y", buf, p);
 
     WritePrivateProfileStringA(SEC_INPUT, "Backend", d->input_backend, p);
 

@@ -9,6 +9,9 @@
  *   the visual specification, so KeyODO pins the classic palette and draws
  *   every 3D edge itself using the recipes measured from real GDI
  *   (reports/gdi_edge_probe.txt).
+ *
+ * Fonts are NOT here: they depend on the monitor DPI, so they live in
+ * metrics.h alongside the rest of the device-dependent values.
  * ======================================================================== */
 
 #ifndef KEYODO_THEME_H
@@ -50,36 +53,37 @@ typedef struct Theme {
     COLORREF highlight;     /* COLOR_HIGHLIGHT   #000080 */
     COLORREF highlight_text;
     COLORREF red;
-
-    HFONT f_ui;             /* SimSun 9pt  (12 px) -- menu, labels, buttons */
-    HFONT f_ui_bold;        /* SimSun 9pt bold -- caption text              */
-    HFONT f_dial;           /* Arial Bold 8pt  (11 px) -- tick numerals     */
-    HFONT f_drum;           /* Arial Bold 15pt (20 px) -- odometer drum     */
-    HFONT f_readout;        /* Arial Bold 17 px -- KPM / MAX / embedded     */
-    HFONT f_huge;           /* Arial Bold 22pt (29 px) -- main read-out     */
-    HFONT f_gear_sm;        /* Arial Bold 20 px -- "M1".."M3"               */
-    HFONT f_gate;           /* Arial Bold 14 px -- selector gate            */
 } Theme;
 
 extern Theme g_theme;
 
 void Theme_Init(void);
-void Theme_Done(void);
 
 /* exact single-pixel primitives */
 void Theme_HLine(HDC hdc, int x0, int x1, int y, COLORREF c);
 void Theme_VLine(HDC hdc, int x, int y0, int y1, COLORREF c);
+/* thickness variants, for the 1 px frame of a group box at scaled DPI */
+void Theme_HLineT(HDC hdc, int x0, int x1, int y, int t, COLORREF c);
+void Theme_VLineT(HDC hdc, int x, int y0, int y1, int t, COLORREF c);
 void Theme_Fill(HDC hdc, const RECT *rc, COLORREF c);
 void Theme_Rect1(HDC hdc, const RECT *rc, COLORREF c);
 
-/* measured DrawEdge replacement */
+/* measured DrawEdge replacement; `thickness` is Metrics.bevel at the caller */
 void Theme_DrawEdge(HDC hdc, const RECT *rc, int kind, int thickness);
 void Theme_Panel(HDC hdc, const RECT *rc, COLORREF fill, int kind, int thickness);
+
+/* Two-ring bevel with explicit inks, used by the push and caption buttons.
+ * At bevel 2 this is exactly the 96-DPI shape: 1 px outer ring, 1 px inner. */
+void Theme_Bevel(HDC hdc, const RECT *rc,
+                 COLORREF tlOuter, COLORREF tlInner,
+                 COLORREF brInner, COLORREF brOuter, int bevel);
 
 /* caption-button glyph masks, 16 wide x 14 tall, MSB = leftmost pixel */
 extern const unsigned short kGlyphClose[14];
 extern const unsigned short kGlyphMin[14];
 
-void Theme_Glyph(HDC hdc, int x, int y, const unsigned short *mask, COLORREF ink);
+/* `px` is the size of one mask cell in device pixels (Metrics.bevel at 100%). */
+void Theme_Glyph(HDC hdc, int x, int y, const unsigned short *mask,
+                 COLORREF ink, int px);
 
 #endif /* KEYODO_THEME_H */

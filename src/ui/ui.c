@@ -2,16 +2,15 @@
  * ui.c -- KeyODO main window: Windows 98 chrome, layout and painting.
  *
  * The window is a WS_POPUP with no system caption. Everything the reference
- * screenshot shows -- 1 px black outline, 3 px frame, gradient caption,
- * minimise and close buttons, menu bar, group boxes, dial, drums, gear gate,
- * status bar -- is painted here with GDI using the pinned classic palette.
- * That is the only way to get the same picture on Windows 98 SE and on a
- * modern Windows, where the native frame and menu are themed.
+ * screenshot shows -- 1 px black outline, frame, gradient caption, minimise and
+ * close buttons, menu bar, group boxes, dial, drums, gear gate, status bar --
+ * is painted here with GDI using the pinned classic palette. That is the only
+ * way to get the same picture on Windows 98 SE and on a modern Windows, where
+ * the native frame and menu are themed.
  *
- * Layout constants come from include/keyodo_layout.h and are the same numbers
- * the reference renderer uses. Content is drawn with the viewport origin moved
- * to (KW_FRAME, KW_FRAME + KW_CAPTION_H), so client-area coordinates apply
- * unchanged.
+ * All geometry comes from Metrics, which scales the 96-DPI specification in
+ * include/keyodo_layout.h by the monitor DPI. At 100% every value equals the
+ * constant, which is what keeps the reference-render comparison exact.
  * ======================================================================== */
 
 #include "ui.h"
@@ -19,6 +18,7 @@
 #include "widgets.h"
 #include "gauge.h"
 #include "gear.h"
+#include "metrics.h"
 
 #include "keyodo_layout.h"
 #include "../common.h"
@@ -26,11 +26,6 @@
 #include "resource.h"
 
 #include <string.h>
-
-/* The layout header names these KW_*; the drawing code reads better with the
- * short forms, and they are the same numbers. */
-#define WIN_W  KW_WIN_W
-#define WIN_H  KW_WIN_H
 
 /* ======================================================================
  * cached strings -- all Chinese text lives in the resource string table so
@@ -109,6 +104,9 @@ static void draw_icon(HDC hdc, int ox, int oy)
 {
     const Theme *t = &g_theme;
     int y, x;
+    int u = M.unit;
+    RECT r;
+
     for (y = 0; y < 16; y++) {
         const char *row = kIcon16[y];
         for (x = 0; x < 16; x++) {
@@ -120,7 +118,11 @@ static void draw_icon(HDC hdc, int ox, int oy)
             case 'k': c = t->shadow;  break;
             default:  continue;
             }
-            SetPixelV(hdc, ox + x, oy + y, c);
+            r.left = ox + x * u;
+            r.top = oy + y * u;
+            r.right = r.left + u;
+            r.bottom = r.top + u;
+            Theme_Fill(hdc, &r, c);
         }
     }
 }
@@ -148,6 +150,15 @@ static void free_backbuffer(void)
     s_memW = s_memH = 0;
 }
 
+static void free_gradient(void)
+{
+    if (s_gradBmp != NULL) {
+        DeleteObject(s_gradBmp);
+        s_gradBmp = NULL;
+        s_gradW = 0;
+    }
+}
+
 static int ensure_backbuffer(HWND hwnd, HDC hdc)
 {
     RECT rc;
@@ -173,13 +184,14 @@ static int ensure_backbuffer(HWND hwnd, HDC hdc)
     return 1;
 }
 
-/* The caption fade never changes, so it is rasterised once. Drawing 474
- * FillRect calls on every frame would be far too much for a 1998 CPU. */
+/* The caption fade never changes for a given width, so it is rasterised once.
+ * One FillRect per column on every frame would be far too much for a 1998 CPU,
+ * and at 200% there are twice as many columns. */
 static void ensure_caption_gradient(HDC hdc)
 {
     const Theme *t = &g_theme;
-    int w = WIN_W - 2 * KW_FRAME;
-    int h = KW_CAPTION_H;
+    int w = M.winW - 2 * M.frame;
+    int h = M.caption;
     HDC mdc;
     HGDIOBJ old;
     int x;
@@ -187,10 +199,7 @@ static void ensure_caption_gradient(HDC hdc)
 
     if (s_gradBmp != NULL && s_gradW == w)
         return;
-    if (s_gradBmp != NULL) {
-        DeleteObject(s_gradBmp);
-        s_gradBmp = NULL;
-    }
+    free_gradient();
 
     s_gradBmp = CreateCompatibleBitmap(hdc, w, h);
     if (s_gradBmp == NULL)
@@ -224,23 +233,21 @@ static void ensure_caption_gradient(HDC hdc)
  * ==================================================================== */
 
 #define MENU_ITEM_COUNT 5
-#define MENU_PAD_X      6
-#define MENU_GAP        12
 
-/* Fills `out` with the clickable rectangle of item `index`; 0 if out of range. */
 static int menubar_item_rect(HDC hdc, int index, RECT *out)
 {
     int x, i;
+    int gap = Metrics_S(12);
     if (index < 0 || index >= MENU_ITEM_COUNT)
         return 0;
-    x = 2;
+    x = Metrics_S(2);
     for (i = 0; i < MENU_ITEM_COUNT; i++) {
-        int w = Widget_TextWidth(hdc, g_theme.f_ui, S.menu[i]) + MENU_GAP;
+        int w = Widget_TextWidth(hdc, M.fUi, S.menu[i]) + gap;
         if (i == index) {
             out->left = x;
             out->top = 0;
             out->right = x + w;
-            out->bottom = KW_MENUBAR_H;
+            out->bottom = M.menubar;
             return 1;
         }
         x += w;
@@ -272,11 +279,11 @@ static void draw_frame(HDC hdc)
     RECT rc;
     int i;
 
-    rc.left = 0; rc.top = 0; rc.right = WIN_W; rc.bottom = WIN_H;
+    rc.left = 0; rc.top = 0; rc.right = M.winW; rc.bottom = M.winH;
     Theme_Rect1(hdc, &rc, t->frame);
 
-    for (i = 1; i < KW_FRAME; i++) {
-        rc.left = i; rc.top = i; rc.right = WIN_W - i; rc.bottom = WIN_H - i;
+    for (i = 1; i < M.frame; i++) {
+        rc.left = i; rc.top = i; rc.right = M.winW - i; rc.bottom = M.winH - i;
         Theme_Rect1(hdc, &rc, t->face);
     }
 }
@@ -284,13 +291,13 @@ static void draw_frame(HDC hdc)
 static void draw_caption(HDC hdc)
 {
     const Theme *t = &g_theme;
-    RECT rc;
+    RECT rc, b;
     char title[64];
 
-    rc.left = KW_FRAME;
-    rc.top = KW_FRAME;
-    rc.right = WIN_W - KW_FRAME;
-    rc.bottom = KW_FRAME + KW_CAPTION_H;
+    rc.left = M.frame;
+    rc.top = M.frame;
+    rc.right = M.winW - M.frame;
+    rc.bottom = M.frame + M.caption;
 
     if (s_model.active) {
         ensure_caption_gradient(hdc);
@@ -308,24 +315,19 @@ static void draw_caption(HDC hdc)
         Theme_Fill(hdc, &rc, t->caption_inactive);
     }
 
-    draw_icon(hdc, KW_ICON_X, KW_ICON_Y);
+    draw_icon(hdc, M.iconX, M.iconY);
 
     load_str(IDS_APP_TITLE, title, sizeof(title));
-    /* Transparent: the caption is a gradient, an opaque background would
-     * paint a flat block across it. */
-    Widget_TextAtClear(hdc, KW_TITLE_X, KW_TITLE_Y, title, t->f_ui_bold,
+    Widget_TextAtClear(hdc, M.titleX, M.titleY, title, M.fUiBold,
                        s_model.active ? t->caption_text : t->caption_inactive_text);
 
-    {
-        RECT b;
-        b.left = KW_CAPBTN_MIN_X; b.top = KW_CAPBTN_Y;
-        b.right = b.left + KW_CAPBTN_W; b.bottom = b.top + KW_CAPBTN_H;
-        Widget_CaptionButton(hdc, &b, kGlyphMin, s_model.pressed == IDC_CAP_MIN);
+    b.left = M.capBtnMinX; b.top = M.capBtnY;
+    b.right = b.left + M.capBtnW; b.bottom = b.top + M.capBtnH;
+    Widget_CaptionButton(hdc, &b, kGlyphMin, s_model.pressed == IDC_CAP_MIN);
 
-        b.left = KW_CAPBTN_CLOSE_X; b.top = KW_CAPBTN_Y;
-        b.right = b.left + KW_CAPBTN_W; b.bottom = b.top + KW_CAPBTN_H;
-        Widget_CaptionButton(hdc, &b, kGlyphClose, s_model.pressed == IDC_CAP_CLOSE);
-    }
+    b.left = M.capBtnCloseX; b.top = M.capBtnY;
+    b.right = b.left + M.capBtnW; b.bottom = b.top + M.capBtnH;
+    Widget_CaptionButton(hdc, &b, kGlyphClose, s_model.pressed == IDC_CAP_CLOSE);
 }
 
 static void draw_menubar(HDC hdc)
@@ -333,8 +335,9 @@ static void draw_menubar(HDC hdc)
     const Theme *t = &g_theme;
     RECT rc;
     int i;
+    int padX = Metrics_S(6);
 
-    rc.left = 0; rc.top = 0; rc.right = KW_CLIENT_W; rc.bottom = KW_MENUBAR_H;
+    rc.left = 0; rc.top = 0; rc.right = M.clientW; rc.bottom = M.menubar;
     Theme_Fill(hdc, &rc, t->menu);
 
     for (i = 0; i < MENU_ITEM_COUNT; i++) {
@@ -346,11 +349,11 @@ static void draw_menubar(HDC hdc)
         if (!menubar_item_rect(hdc, i, &cell))
             break;
 
-        Widget_TextAt(hdc, cell.left + MENU_PAD_X, 4, label,
-                      t->f_ui, t->menutext, t->menu);
+        Widget_TextAt(hdc, cell.left + padX, Metrics_S(4), label,
+                      M.fUi, t->menutext, t->menu);
 
         /* accelerator underline under the letter inside the parentheses */
-        px = cell.left + MENU_PAD_X;
+        px = cell.left + padX;
         for (lp = label; *lp != 0 && *lp != '('; lp++)
             ;
         if (*lp == '(') {
@@ -360,15 +363,16 @@ static void draw_menubar(HDC hdc)
             if (n > (int)sizeof(prefix) - 1) n = (int)sizeof(prefix) - 1;
             memcpy(prefix, label, n);
             prefix[n] = 0;
-            px += Widget_TextWidth(hdc, t->f_ui, prefix);
-            aw = 6;
+            px += Widget_TextWidth(hdc, M.fUi, prefix);
+            aw = Metrics_S(6);
             lp++;
             if (*lp != 0 && *lp != ')') {
                 one[0] = *lp;
                 one[1] = 0;
-                aw = Widget_TextWidth(hdc, t->f_ui, one);
+                aw = Widget_TextWidth(hdc, M.fUi, one);
             }
-            Theme_HLine(hdc, px, px + aw, KW_MENUBAR_H - 3, t->menutext);
+            Theme_HLineT(hdc, px, px + aw, M.menubar - Metrics_S(3),
+                         M.unit, t->menutext);
         }
     }
 }
@@ -377,22 +381,25 @@ static void draw_statusbar(HDC hdc)
 {
     const Theme *t = &g_theme;
     RECT rc;
-    int t0 = KW_CLIENT_H - KW_STATUSBAR_H;
+    int t0 = M.clientH - M.statusbar;
+    int pad = Metrics_S(4);
+    int u = M.unit;
 
-    rc.left = 0; rc.top = t0; rc.right = KW_CLIENT_W; rc.bottom = KW_CLIENT_H;
+    rc.left = 0; rc.top = t0; rc.right = M.clientW; rc.bottom = M.clientH;
     Theme_Fill(hdc, &rc, t->face);
-    Theme_DrawEdge(hdc, &rc, TK_SUNKEN, 1);
+    Theme_DrawEdge(hdc, &rc, TK_SUNKEN, u);
 
-    Theme_VLine(hdc, SB_PANE2_X - 2, t0 + 1, KW_CLIENT_H - 1, t->shadow);
-    Theme_VLine(hdc, SB_PANE2_X - 1, t0 + 1, KW_CLIENT_H - 1, t->hilight);
-    Theme_VLine(hdc, SB_PANE3_X - 2, t0 + 1, KW_CLIENT_H - 1, t->shadow);
-    Theme_VLine(hdc, SB_PANE3_X - 1, t0 + 1, KW_CLIENT_H - 1, t->hilight);
+    Theme_VLineT(hdc, M.sbPane2X - 2 * u, t0 + u, M.clientH - u, u, t->shadow);
+    Theme_VLineT(hdc, M.sbPane2X - u, t0 + u, M.clientH - u, u, t->hilight);
+    Theme_VLineT(hdc, M.sbPane3X - 2 * u, t0 + u, M.clientH - u, u, t->shadow);
+    Theme_VLineT(hdc, M.sbPane3X - u, t0 + u, M.clientH - u, u, t->hilight);
 
-    Widget_TextAt(hdc, 5, t0 + 4, S.statusReady, t->f_ui, t->btntext, t->face);
-    Widget_TextAt(hdc, SB_PANE2_X + 3, t0 + 4, s_model.uptime, t->f_ui,
-                  t->btntext, t->face);
-    Widget_TextAt(hdc, SB_PANE3_X + 3, t0 + 4, s_model.status, t->f_ui,
-                  t->btntext, t->face);
+    Widget_TextAt(hdc, Metrics_S(5), t0 + pad, S.statusReady,
+                  M.fUi, t->btntext, t->face);
+    Widget_TextAt(hdc, M.sbPane2X + Metrics_S(3), t0 + pad, s_model.scale,
+                  M.fUi, t->btntext, t->face);
+    Widget_TextAt(hdc, M.sbPane3X + Metrics_S(3), t0 + pad, s_model.status,
+                  M.fUi, t->btntext, t->face);
 }
 
 /* ======================================================================
@@ -405,15 +412,21 @@ static void draw_content(HDC hdc)
     RECT rc, band;
     static const char *const autoGears[] = KTM_GEARS_AUTO;
     static const char *const manGears[] = KTM_GEARS_MANUAL;
+    int saved;
 
-    band.left = 0; band.top = KW_CONTENT_Y;
-    band.right = KW_CLIENT_W; band.bottom = KW_CONTENT_Y + KW_CONTENT_H;
+    band.left = 0; band.top = M.contentY;
+    band.right = M.clientW; band.bottom = M.contentY + M.contentH;
     Theme_Fill(hdc, &band, t->face);
 
     /* ---- speedometer ---- */
-    RECT_SET(rc, RECT_GB_SPEED);
+    rc = M.gbSpeed;
     Widget_GroupBox(hdc, &rc, S.gbSpeed);
 
+    /* The dial draws in its own coordinates. OffsetViewportOrgEx adds to the
+     * current client origin; SetViewportOrgEx would REPLACE it and drop the
+     * client offset, painting the dial over the group box caption. */
+    saved = SaveDC(hdc);
+    OffsetViewportOrgEx(hdc, M.dialPanel.left, M.dialPanel.top, NULL);
     {
         GaugeSpec g;
         g.value = s_model.gauge_value;
@@ -422,47 +435,51 @@ static void draw_content(HDC hdc)
         g.mode_kpm = s_model.mode_kpm;
         Gauge_Draw(hdc, &g);
     }
+    RestoreDC(hdc, saved);
 
-    RECT_SET(rc, RECT_GEAR_VALUE);
-    Gear_DrawValue(hdc, &rc, s_model.gear,
-                   s_model.value);
+    rc = M.gearValue;
+    Gear_DrawValue(hdc, &rc, s_model.gear, s_model.value);
 
     /* ---- odometer ---- */
-    RECT_SET(rc, RECT_GB_ODO);
+    rc = M.gbOdo;
     Widget_GroupBox(hdc, &rc, S.gbOdo);
 
-    Widget_TextAt(hdc, 270, ODO_CAP_Y, S.lblOdo, t->f_ui, t->btntext, t->face);
-    RECT_SET(rc, RECT_ODO_DRUM);
-    Widget_Drum(hdc, &rc, s_model.odo, DRUM_CELL_W);
+    Widget_TextAt(hdc, Metrics_S(270), M.odoCapY, S.lblOdo,
+                  M.fUi, t->btntext, t->face);
+    rc = M.odoDrum;
+    Widget_Drum(hdc, &rc, s_model.odo, M.cellW);
 
-    Widget_TextAt(hdc, 270, TRIP_CAP_Y, S.lblTrip, t->f_ui, t->btntext, t->face);
-    RECT_SET(rc, RECT_TRIP_DRUM);
-    Widget_Drum(hdc, &rc, s_model.trip, DRUM_CELL_W);
+    Widget_TextAt(hdc, Metrics_S(270), M.tripCapY, S.lblTrip,
+                  M.fUi, t->btntext, t->face);
+    rc = M.tripDrum;
+    Widget_Drum(hdc, &rc, s_model.trip, M.cellW);
 
-    RECT_SET(rc, RECT_TRIP_RESET);
+    rc = M.tripReset;
     Widget_PushButton(hdc, &rc, S.btnTrip, s_model.pressed == IDC_BTN_TRIP);
 
     /* ---- rate ---- */
-    RECT_SET(rc, RECT_GB_RATE);
+    rc = M.gbRate;
     Widget_GroupBox(hdc, &rc, S.gbRate);
 
-    Widget_TextAt(hdc, 270, KPM_CAP_Y, S.lblKpm, t->f_ui, t->btntext, t->face);
-    RECT_SET(rc, RECT_KPM_PANEL);
-    Widget_Readout(hdc, &rc, s_model.kpm, t->f_readout);
+    Widget_TextAt(hdc, Metrics_S(270), M.kpmCapY, S.lblKpm,
+                  M.fUi, t->btntext, t->face);
+    rc = M.kpmPanel;
+    Widget_Readout(hdc, &rc, s_model.kpm, M.fReadout);
 
-    Widget_TextAt(hdc, 270, MAX_CAP_Y, S.lblMax, t->f_ui, t->btntext, t->face);
-    RECT_SET(rc, RECT_MAX_PANEL);
-    Widget_Readout(hdc, &rc, s_model.maxv, t->f_readout);
+    Widget_TextAt(hdc, Metrics_S(270), M.maxCapY, S.lblMax,
+                  M.fUi, t->btntext, t->face);
+    rc = M.maxPanel;
+    Widget_Readout(hdc, &rc, s_model.maxv, M.fReadout);
 
     if (s_model.show_gate) {
-        RECT_SET(rc, RECT_GEAR_GATE);
+        rc = M.gearGate;
         if (s_model.transmission == KTM_MANUAL)
             Gear_DrawGate(hdc, &rc, manGears, KTM_COUNT_MANUAL, s_model.gear);
         else
             Gear_DrawGate(hdc, &rc, autoGears, KTM_COUNT_AUTO, s_model.gear);
     }
 
-    RECT_SET(rc, RECT_PEAK_RESET);
+    rc = M.peakReset;
     Widget_PushButton(hdc, &rc, S.btnPeak, s_model.pressed == IDC_BTN_PEAK);
 }
 
@@ -473,7 +490,7 @@ static void paint_all(HDC hdc)
     draw_frame(hdc);
     draw_caption(hdc);
 
-    SetViewportOrgEx(hdc, KW_FRAME, KW_FRAME + KW_CAPTION_H, NULL);
+    SetViewportOrgEx(hdc, M.frame, M.frame + M.caption, NULL);
     draw_menubar(hdc);
     draw_content(hdc);
     draw_statusbar(hdc);
@@ -485,37 +502,34 @@ static void paint_all(HDC hdc)
  * hit testing
  * ==================================================================== */
 
-static void cap_rect(int x, RECT *r)
-{
-    r->left = x; r->top = KW_CAPBTN_Y;
-    r->right = x + KW_CAPBTN_W; r->bottom = KW_CAPBTN_Y + KW_CAPBTN_H;
-}
-
 /* kind: 0 = nothing, 1 = control (id set), 2 = caption drag */
-static int hit_test(HWND hwnd, POINT pt, int *id)
+static int hit_test(POINT pt, int *id)
 {
     RECT r;
 
     *id = 0;
 
-    cap_rect(KW_CAPBTN_CLOSE_X, &r);
+    r.left = M.capBtnCloseX; r.top = M.capBtnY;
+    r.right = r.left + M.capBtnW; r.bottom = r.top + M.capBtnH;
     if (PtInRect(&r, pt)) { *id = IDC_CAP_CLOSE; return 1; }
-    cap_rect(KW_CAPBTN_MIN_X, &r);
+
+    r.left = M.capBtnMinX; r.top = M.capBtnY;
+    r.right = r.left + M.capBtnW; r.bottom = r.top + M.capBtnH;
     if (PtInRect(&r, pt)) { *id = IDC_CAP_MIN; return 1; }
 
-    r.left = KW_FRAME; r.top = KW_FRAME;
-    r.right = KW_WIN_W - KW_FRAME; r.bottom = KW_FRAME + KW_CAPTION_H;
+    r.left = M.frame; r.top = M.frame;
+    r.right = M.winW - M.frame; r.bottom = M.frame + M.caption;
     if (PtInRect(&r, pt))
         return 2;
 
     /* client-area buttons */
     {
         POINT c;
-        c.x = pt.x - KW_FRAME;
-        c.y = pt.y - (KW_FRAME + KW_CAPTION_H);
-        RECT_SET(r, RECT_TRIP_RESET);
+        c.x = pt.x - M.frame;
+        c.y = pt.y - (M.frame + M.caption);
+        r = M.tripReset;
         if (PtInRect(&r, c)) { *id = IDC_BTN_TRIP; return 1; }
-        RECT_SET(r, RECT_PEAK_RESET);
+        r = M.peakReset;
         if (PtInRect(&r, c)) { *id = IDC_BTN_PEAK; return 1; }
     }
     return 0;
@@ -537,12 +551,12 @@ static void show_menu(HWND hwnd, int index)
 
     hdc = GetDC(hwnd);
     if (!menubar_item_rect(hdc, index, &cell))
-        cell.left = 2;
+        cell.left = Metrics_S(2);
     ReleaseDC(hwnd, hdc);
 
     GetWindowRect(hwnd, &wr);
-    pt.x = wr.left + KW_FRAME + cell.left;
-    pt.y = wr.top + KW_FRAME + KW_CAPTION_H + KW_MENUBAR_H;
+    pt.x = wr.left + M.frame + cell.left;
+    pt.y = wr.top + M.frame + M.caption + M.menubar;
 
     cmd = (int)TrackPopupMenu(sub,
                               TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD |
@@ -577,31 +591,55 @@ static LRESULT CALLBACK Ui_WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     }
 
+    case WM_DPICHANGED: {
+        /* Moved to a monitor with a different scaling: rebuild every metric
+         * and font, then resize. The suggested rectangle assumes a system
+         * frame, which this window does not have, so only its origin is used
+         * and the size is recomputed from Metrics. */
+        RECT *suggested = (RECT *)lp;
+        Metrics_Init(hwnd);
+        free_backbuffer();
+        free_gradient();
+        SetWindowPos(hwnd, NULL, suggested->left, suggested->top,
+                     M.winW, M.winH, SWP_NOZORDER | SWP_NOACTIVATE);
+        InvalidateRect(hwnd, NULL, FALSE);
+        return 0;
+    }
+
+    case UIWM_DPI_REFRESH: {
+        Metrics_Init(hwnd);
+        free_backbuffer();
+        free_gradient();
+        SetWindowPos(hwnd, NULL, 0, 0, M.winW, M.winH,
+                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+        InvalidateRect(hwnd, NULL, FALSE);
+        return 0;
+    }
+
     case WM_NCHITTEST: {
         POINT pt;
         int id;
         pt.x = (short)LOWORD(lp);
         pt.y = (short)HIWORD(lp);
         ScreenToClient(hwnd, &pt);
-        if (hit_test(hwnd, pt, &id) == 2)
+        if (hit_test(pt, &id) == 2)
             return HTCAPTION;
         return HTCLIENT;
     }
 
     case WM_LBUTTONDOWN: {
         POINT pt;
-        int id;
-        int kind;
+        int id, kind;
 
         pt.x = (short)LOWORD(lp);
         pt.y = (short)HIWORD(lp);
 
         /* menu bar click */
-        if (pt.y >= KW_FRAME + KW_CAPTION_H &&
-            pt.y < KW_FRAME + KW_CAPTION_H + KW_MENUBAR_H &&
-            pt.x >= KW_FRAME && pt.x < KW_FRAME + KW_CLIENT_W) {
+        if (pt.y >= M.frame + M.caption &&
+            pt.y < M.frame + M.caption + M.menubar &&
+            pt.x >= M.frame && pt.x < M.frame + M.clientW) {
             HDC hdc = GetDC(hwnd);
-            int idx = menubar_index_at(hdc, pt.x - KW_FRAME);
+            int idx = menubar_index_at(hdc, pt.x - M.frame);
             ReleaseDC(hwnd, hdc);
             if (idx >= 0) {
                 show_menu(hwnd, idx);
@@ -609,7 +647,7 @@ static LRESULT CALLBACK Ui_WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
             }
         }
 
-        kind = hit_test(hwnd, pt, &id);
+        kind = hit_test(pt, &id);
         if (kind == 1) {
             s_model.pressed = id;
             InvalidateRect(hwnd, NULL, FALSE);
@@ -627,7 +665,7 @@ static LRESULT CALLBACK Ui_WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
         pt.x = (short)LOWORD(lp);
         pt.y = (short)HIWORD(lp);
-        kind = hit_test(hwnd, pt, &id);
+        kind = hit_test(pt, &id);
         s_model.pressed = 0;
         InvalidateRect(hwnd, NULL, FALSE);
 
@@ -666,12 +704,7 @@ static LRESULT CALLBACK Ui_WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 
     case WM_DESTROY:
         free_backbuffer();
-        if (s_gradBmp != NULL) {
-            DeleteObject(s_gradBmp);
-            s_gradBmp = NULL;
-            s_gradW = 0;
-        }
-        Widget_Shutdown();
+        free_gradient();
         if (s_hooks != NULL && s_hooks->on_destroy != NULL)
             s_hooks->on_destroy(hwnd);
         return 0;
@@ -700,6 +733,7 @@ HWND Ui_Create(HINSTANCE hInst, const UiHooks *hooks)
     s_model.show_gate = 1;
 
     Theme_Init();
+    Metrics_Init(NULL);          /* system DPI, before a window exists */
     load_strings();
 
     s_menu = LoadMenuA(hInst, MAKEINTRESOURCEA(IDM_MAIN));
@@ -718,18 +752,25 @@ HWND Ui_Create(HINSTANCE hInst, const UiHooks *hooks)
         return NULL;
 
     /* No WS_CAPTION and no WS_THICKFRAME: the classic frame is painted by
-     * draw_frame()/draw_caption(), which keeps it identical on every Windows.
-     * WM_NCHITTEST returns HTCAPTION over the caption so dragging, the system
-     * menu and Alt+F4 still work through DefWindowProc. */
+     * draw_frame()/draw_caption(), which keeps it identical on every Windows
+     * and lets the window size follow the monitor DPI exactly. WM_NCHITTEST
+     * returns HTCAPTION over the caption so dragging, the system menu and
+     * Alt+F4 still work through DefWindowProc. */
     style = WS_POPUP | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN;
 
-    x = (GetSystemMetrics(SM_CXSCREEN) - WIN_W) / 2;
-    y = (GetSystemMetrics(SM_CYSCREEN) - WIN_H) / 2;
+    x = (GetSystemMetrics(SM_CXSCREEN) - M.winW) / 2;
+    y = (GetSystemMetrics(SM_CYSCREEN) - M.winH) / 2;
 
     hwnd = CreateWindowExA(WS_EX_APPWINDOW, "KeyODO_Main", KEYODO_NAME, style,
-                           x, y, WIN_W, WIN_H, NULL, NULL, hInst, NULL);
+                           x, y, M.winW, M.winH, NULL, NULL, hInst, NULL);
     if (hwnd == NULL)
         return NULL;
+
+    /* Now that the window exists, take the DPI of the monitor it landed on. */
+    Metrics_Init(hwnd);
+    free_gradient();
+    SetWindowPos(hwnd, NULL, 0, 0, M.winW, M.winH,
+                 SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 
     Plat_ApplyFrameTweaks(hwnd);
     return hwnd;
@@ -752,7 +793,6 @@ void Ui_SetModel(HWND hwnd, const UiModel *m)
 
     if (!s_haveModel) {
         s_model = *m;
-        s_model.pressed = s_model.pressed;
         s_haveModel = 1;
         changed = 1;
     } else {
@@ -763,6 +803,7 @@ void Ui_SetModel(HWND hwnd, const UiModel *m)
         if (strcmp(s_model.maxv, m->maxv) != 0) changed = 1;
         if (strcmp(s_model.uptime, m->uptime) != 0) changed = 1;
         if (strcmp(s_model.status, m->status) != 0) changed = 1;
+        if (strcmp(s_model.scale, m->scale) != 0) changed = 1;
         if (s_model.mode_kpm != m->mode_kpm) changed = 1;
         if (s_model.show_gate != m->show_gate) changed = 1;
         if (s_model.transmission != m->transmission) changed = 1;
@@ -782,28 +823,29 @@ void Ui_SetModel(HWND hwnd, const UiModel *m)
     {
         RECT dirty, g;
         Gauge_DirtyRect(&dirty);
-        OffsetRect(&dirty, KW_FRAME, KW_FRAME + KW_CAPTION_H);
+        OffsetRect(&dirty, M.dialPanel.left, M.dialPanel.top);
+        OffsetRect(&dirty, M.frame, M.frame + M.caption);
 
-        RECT_SET(g, RECT_GEAR_VALUE);
-        OffsetRect(&g, KW_FRAME, KW_FRAME + KW_CAPTION_H);
+        g = M.gearValue;
+        OffsetRect(&g, M.frame, M.frame + M.caption);
         UnionRect(&dirty, &dirty, &g);
 
-        RECT_SET(g, RECT_KPM_PANEL);
-        OffsetRect(&g, KW_FRAME, KW_FRAME + KW_CAPTION_H);
+        g = M.kpmPanel;
+        OffsetRect(&g, M.frame, M.frame + M.caption);
         UnionRect(&dirty, &dirty, &g);
 
-        RECT_SET(g, RECT_MAX_PANEL);
-        OffsetRect(&g, KW_FRAME, KW_FRAME + KW_CAPTION_H);
+        g = M.maxPanel;
+        OffsetRect(&g, M.frame, M.frame + M.caption);
         UnionRect(&dirty, &dirty, &g);
 
-        RECT_SET(g, RECT_GEAR_GATE);
-        OffsetRect(&g, KW_FRAME, KW_FRAME + KW_CAPTION_H);
+        g = M.gearGate;
+        OffsetRect(&g, M.frame, M.frame + M.caption);
         UnionRect(&dirty, &dirty, &g);
 
         g.left = 0;
-        g.top = KW_FRAME + KW_CAPTION_H + KW_CLIENT_H - KW_STATUSBAR_H;
-        g.right = WIN_W;
-        g.bottom = WIN_H - KW_FRAME;
+        g.top = M.frame + M.caption + M.clientH - M.statusbar;
+        g.right = M.winW;
+        g.bottom = M.winH - M.frame;
         UnionRect(&dirty, &dirty, &g);
 
         InvalidateRect(hwnd, &dirty, FALSE);
@@ -838,6 +880,7 @@ void Ui_SyncMenu(HWND hwnd, const UiModel *m)
         check_item(view, IDM_SHOW_GEAR, m->show_gate);
         check_item(view, IDM_TM_AUTO, m->transmission == KTM_AUTO);
         check_item(view, IDM_TM_MANUAL, m->transmission == KTM_MANUAL);
+        check_item(view, IDM_SHOW_WIDGET, m->widget);
     }
 }
 

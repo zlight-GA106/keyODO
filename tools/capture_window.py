@@ -116,6 +116,8 @@ def main(argv):
     out = os.path.join(root, "build", "capture.png")
     keep = "--keep" in argv
     seconds = 1.5
+    exe_args = []
+    wnd_class = "KeyODO_Main"
     for i, a in enumerate(argv):
         if a == "--exe" and i + 1 < len(argv):
             exe = argv[i + 1]
@@ -123,18 +125,26 @@ def main(argv):
             out = argv[i + 1]
         if a == "--seconds" and i + 1 < len(argv):
             seconds = float(argv[i + 1])
+        if a == "--arg" and i + 1 < len(argv):
+            exe_args.append(argv[i + 1])
+        if a == "--widget":
+            wnd_class = "KeyODO_Gauge"
+        if a == "--class" and i + 1 < len(argv):
+            wnd_class = argv[i + 1]
+        if a.startswith("--dpi="):
+            exe_args.append(a)
 
     if not os.path.exists(exe):
         print("missing executable: %s" % exe)
         return 1
 
-    proc = subprocess.Popen([exe], stdout=subprocess.DEVNULL,
+    proc = subprocess.Popen([exe] + exe_args, stdout=subprocess.DEVNULL,
                             stderr=subprocess.DEVNULL)
     try:
         hwnd = None
         deadline = time.time() + 10
         while time.time() < deadline:
-            hwnd = u32.FindWindowA(b"KeyODO_Main", None)
+            hwnd = u32.FindWindowA(wnd_class.encode(), None)
             if hwnd:
                 break
             time.sleep(0.1)

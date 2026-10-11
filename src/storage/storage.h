@@ -21,6 +21,12 @@ typedef struct StoreData {
 
     int win_x, win_y;
 
+    int dpi_override;      /* 0 = follow the monitor, else 96/120/144/192... */
+
+    /* detached desktop gauge */
+    int widget_shown;
+    int widget_x, widget_y;
+
     char input_backend[16]; /* "raw" or "hook"                    */
 } StoreData;
 

@@ -105,11 +105,13 @@ src/
   common.c / .h       KeyU64 格式化等小工具
   platform/           唯一知道"现在跑在哪个 Windows 上"的模块
   ui/                 界面：窗口、自绘 Win98 chrome、表盘、档位、控件
-    ui.c              窗口过程、布局、命中测试、菜单
-    theme.c / .h      钉死的 Win98 配色 + 实测 3D 边框配方 + 字体
+    ui.c              主窗口：窗口过程、布局、命中测试、菜单
+    metrics.c / .h    把 96 DPI 规格按显示器 DPI 换算成实际尺寸与字体
+    theme.c / .h      钉死的 Win98 配色 + 实测 3D 边框配方
     widgets.c / .h    按钮、分组框、滚轮、读数窗、文字排版
-    gauge.c / .h      WPM 速度表
+    gauge.c / .h      WPM 速度表（在自己的坐标系里绘制）
     gear.c / .h       档位读数与换挡显示
+    widget.c / .h     桌面仪表：只含表盘的独立悬浮窗口
   stats/              按键统计：ODO / TRIP / WPM / KPM / MAX / 档位
   input/              输入后端
     input.h           后端接口
@@ -135,15 +137,35 @@ mockup/               界面设计稿与其渲染器
 :: 端到端：启动、注入按键、检查计数、退出后检查持久化
 python tools\smoke_test.py --keys 20
 
-:: 抓取运行中的窗口为 PNG（用于与设计稿比对）
+:: 抓取运行中的窗口为 PNG（用于与设计稿比对）；--widget 抓桌面仪表
 python tools\capture_window.py --out build\capture.png
+python tools\capture_window.py --widget --out build\widget.png
+
+:: 与设计稿做结构比对（静态部分应逐像素一致）
+python tools\compare_mockup.py --shot build\capture.png
+
+:: 缩放是否真的等比：窗口尺寸、结构线位置、文字是否重新栅格化
+python tools\verify_scaling.py
+
+:: 1080p / 2K / 4K x 16:9 / 16:10 x 各缩放级别是否放得下
+python tools\verify_resolution_matrix.py
+
+:: 桌面仪表的显示、尺寸、位置恢复、越界钳制与持久化
+python tools\widget_test.py
 
 :: 独立验证 Raw Input 在本机是否真的能收到注入按键
 python tools\probe_rawinput.py
-
-:: 与设计稿做结构比对（静态部分应逐像素一致）
-python tools\compare_mockup.py
 ```
+
+### 指定缩放（调试与偏好）
+
+```cmd
+keyodo.exe --dpi=96        :: 在 200% 的屏幕上强制按 100% 布局渲染
+keyodo.exe --dpi=144
+```
+
+等价于 `keyodo.ini` 里的 `[Window] Dpi`（0 = 跟随显示器）。这个开关让
+`tools\verify_scaling.py` 能在一台机器上跑完 100/125/150/200% 四种缩放。
 
 ### 输入后端切换
 
@@ -169,4 +191,13 @@ keyodo.exe --input=hook
 
 ### 高分屏（DPI）
 
-KeyODO 调用 `SetProcessDPIAware()`，在 200% 缩放的屏幕上仍然按 1:1 像素绘制 480×320 窗口：**清晰但物理尺寸偏小**。这是刻意的——设计基准是 480×320 @ 96 DPI，任何缩放都会让 1 px 的立体边框和点阵中文字变糊。若将来需要"物理尺寸一致"，应新增一个按 DPI 因子整体放大的布局模式，而不是让系统拉伸位图。
+KeyODO 按「每显示器 DPI 感知 v2」申请（逐级回退到 v1 → 系统 DPI 感知 → Windows 98 SE
+上无此 API 则停在 96 DPI），然后把 `include/keyodo_layout.h` 里的 96 DPI 规格按显示器
+DPI 换算成实际尺寸与字体，**不做位图拉伸**。因此在 200% 的 4K 屏上界面是 960×640 且文字
+按 2 倍重新栅格化，锐利而不是糊的；1 px 的立体边框也会跟着变粗，保持 Win98 的厚重感。
+
+实测 100% / 125% / 150% / 200% 分别为 480×320、600×400、720×480、960×640，
+`tools\verify_scaling.py` 会逐个验证。跨显示器拖动时 `WM_DPICHANGED` 会触发整体重算；
+桌面仪表与主窗口共用一套缩放，所以要变一起变。
+
+Windows 98 SE 没有多显示器 DPI 概念，行为与当年一致（恒为 96 DPI）。

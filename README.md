@@ -46,9 +46,62 @@ dist\KeyODO_Setup.exe /S /D=C:\KeyODO
 | **档位** | 自动挡 `P R N D` / 手动挡 `R N M1 M2 M3`，只显示当前变速模式相关的档位 |
 | **读数模式** | 表盘内嵌读数与盘下读数可在 WPM / KPM 间切换（`Ctrl+K`） |
 | **换挡显示** | 档位闸，当前档反白；R 档红色 |
+| **桌面仪表** | 把速度表单独抽出来当桌面小组件悬浮显示（见下） |
+| **分辨率与缩放** | 1080p / 2K / 4K 及 100%–200% 缩放，16:9 与 16:10 都能正确摆放（见下） |
 | **总在最前** | 可选 |
 
-读数模式、变速模式、窗口位置、统计窗口长度都会随统计数据一起保存。
+读数模式、变速模式、窗口位置、桌面仪表的位置与开关、统计窗口长度都会随统计数据一起保存。
+
+---
+
+## 分辨率与缩放
+
+窗口和桌面仪表的所有尺寸、字体、立体边框厚度都由 `src/ui/metrics.c` 按显示器 DPI 从
+`include/keyodo_layout.h` 的 96 DPI 规格换算得出，**不是把界面位图拉伸**——4K 屏上文字是
+按 200% 重新栅格化的，所以清晰而不是糊的。
+
+实测（`tools/verify_resolution_matrix.py`，真实启动程序测量）：
+
+| 缩放 | 主窗口 | 桌面仪表 |
+|---|---|---|
+| 100% | 480×320 | 184×184 |
+| 125% | 600×400 | 230×230 |
+| 150% | 720×480 | 276×276 |
+| 200% | 960×640 | 368×368 |
+
+10 种「分辨率 × 缩放 × 宽高比」组合（1080p / 2K / 4K × 16:9 / 16:10 × 常见缩放）全部
+留有余量地放得下。
+
+`tools/verify_scaling.py` 会逐个缩放级别启动程序、抓图，并确认：窗口尺寸精确成比例、
+三个 GroupBox／表盘／状态栏的结构线都落在 `缩放倍数 × 96 DPI 位置`（误差 ≤1px）、
+且画面与「100% 位图放大」明显不同（证明是重新绘制而非拉伸）。
+
+跨显示器拖动时会收到 `WM_DPICHANGED` 并整体重新换算。程序按「每显示器 DPI 感知 v2」
+申请，逐级回退到 v1、系统 DPI 感知，Windows 98 SE 上这些 API 都不存在则自然停在 96 DPI。
+
+如果想让界面比系统缩放更大或更小：
+
+```cmd
+keyodo.exe --dpi=144
+```
+
+或写进 `keyodo.ini` 的 `[Window] Dpi`（0 = 跟随显示器）。
+
+---
+
+## 桌面仪表
+
+菜单「查看 → 桌面仪表」可以把**速度表组件本身**单独抽出来，作为一个无边框小组件悬浮在
+桌面上。它只画表盘：面板、表圈、表盘面、刻度、数字、指针、峰值刻度线，以及表盘内嵌读数。
+没有分组框、没有标题栏、没有菜单、没有其它读数。
+
+![桌面仪表](mockup/out/keyodo_widget_184x184.png)
+
+* 拖动即可移动，位置自动保存
+* 右键出菜单：显示主窗口 / 隐藏桌面仪表 / 退出
+* 始终置顶，不出现在任务栏和 Alt+Tab 里（`WS_EX_TOOLWINDOW`）
+* 尺寸随显示器 DPI 缩放
+* 越界的位置会被拉回工作区，不会跑到屏幕外找不回来
 
 ---
 
@@ -105,14 +158,18 @@ MSVC 6.0 + Windows 98 SDK
 ## 验证
 
 ```cmd
-python tools\smoke_test.py --keys 20      :: 端到端：注入按键 → 计数 → 退出 → 检查持久化
-python tools\capture_window.py            :: 抓取运行中的窗口
-python tools\compare_mockup.py            :: 与设计稿逐像素比对静态部分
-python tools\probe_rawinput.py            :: 独立验证 Raw Input 能否收到注入按键
+python tools\smoke_test.py --keys 20          :: 端到端：注入按键 → 计数 → 退出 → 检查持久化
+python tools\capture_window.py                :: 抓取运行中的窗口
+python tools\capture_window.py --widget       :: 抓取桌面仪表
+python tools\compare_mockup.py                :: 与设计稿逐像素比对静态部分
+python tools\verify_scaling.py                :: 100/125/150/200% 是否真的等比缩放
+python tools\verify_resolution_matrix.py      :: 1080p/2K/4K × 16:9/16:10 是否放得下
+python tools\widget_test.py                   :: 桌面仪表的显示、位置、越界与持久化
+python tools\probe_rawinput.py                :: 独立验证 Raw Input 能否收到注入按键
 ```
 
 `compare_mockup.py` 当前结果：外框、标题栏、菜单栏、三个 GroupBox 边框、表盘面板、
-状态栏边框、两个按钮 —— 全部 0.00%，最大偏差 0.16%。
+状态栏边框、两个按钮 —— 全部 0.00%，最大偏差 0.08%。
 
 ---
 

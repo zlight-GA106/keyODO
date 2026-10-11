@@ -15,6 +15,10 @@
 
 #include <windows.h>
 
+/* Sent to the main window when the detached widget reports a DPI change;
+ * Metrics is global, so both windows must rescale together. */
+#define UIWM_DPI_REFRESH (WM_APP + 1)
+
 typedef struct UiModel {
     /* formatted read-outs */
     char odo[24];
@@ -24,6 +28,7 @@ typedef struct UiModel {
     char maxv[24];
     char uptime[24];
     char status[24];     /* status-bar pane 3, e.g. "62 WPM"  */
+    char scale[24];      /* status-bar pane 2, e.g. "192 DPI 200%" */
 
     /* numeric values the dial needs */
     double gauge_value;  /* the switchable reading, for the embedded read-out */
@@ -37,6 +42,7 @@ typedef struct UiModel {
     char   gear[8];      /* current ratio NAME, owned by the model */
     int    pressed;      /* IDC_* currently drawn pressed, or 0 */
     int    active;       /* window has focus, caption is drawn active */
+    int    widget;       /* detached desktop gauge is visible */
 } UiModel;
 
 typedef struct UiHooks {
