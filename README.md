@@ -13,6 +13,15 @@
 
 ## 快速开始
 
+不想装工具链，直接拿构建好的：
+
+* [`release/keyodo.exe`](release/keyodo.exe) —— 双击即可运行，不写注册表
+* [`release/KeyODO_Setup.exe`](release/KeyODO_Setup.exe) —— 安装程序
+
+校验和与工具链信息见 [`release/`](release/)。
+
+从源码构建：
+
 ```cmd
 build.cmd
 ```
