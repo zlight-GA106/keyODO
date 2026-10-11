@@ -111,6 +111,7 @@ src/
     widgets.c / .h    按钮、分组框、滚轮、读数窗、文字排版
     gauge.c / .h      WPM 速度表（在自己的坐标系里绘制）
     gear.c / .h       档位读数与换挡显示
+    menu.c / .h       自绘的 Win98 下拉菜单（不使用系统 TrackPopupMenu）
     widget.c / .h     桌面仪表：只含表盘的独立悬浮窗口
   stats/              按键统计：ODO / TRIP / WPM / KPM / MAX / 档位
   input/              输入后端
@@ -156,9 +157,20 @@ python tools\widget_test.py
 :: 安装向导逐页截图（自己构建一个可非提权运行的副本）
 python tools\installer_ui_test.py
 
+:: 下拉菜单：键盘导航、回车生效、Esc 不改动、点击空白关闭
+python tools\menu_test.py
+python tools\menu_capture.py
+
 :: 独立验证 Raw Input 在本机是否真的能收到注入按键
 python tools\probe_rawinput.py
 ```
+
+### 哪些测试需要「有桌面的会话」
+
+`smoke_test.py` 与 `needle_test.py` 依赖 `SendInput` 注入按键，`needle_test.py` 还要读屏幕。
+RDP 断开会话或锁屏时两者都会失败（`SendInput` 返回 `ERROR_ACCESS_DENIED (5)`，屏幕读取
+全黑），这是环境限制而不是程序问题。`menu_test.py` / `widget_test.py` / `installer_ui_test.py`
+全部用投递窗口消息 + `PrintWindow`，不需要可见桌面，任何情况下都能跑。
 
 ### 安装向导的中文
 

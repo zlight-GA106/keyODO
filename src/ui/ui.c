@@ -18,6 +18,7 @@
 #include "widgets.h"
 #include "gauge.h"
 #include "gear.h"
+#include "menu.h"
 #include "metrics.h"
 
 #include "keyodo_layout.h"
@@ -45,7 +46,6 @@ static HINSTANCE s_inst = NULL;
 static const UiHooks *s_hooks = NULL;
 static UiModel s_model;
 static int s_haveModel = 0;
-static HMENU s_menu = NULL;
 
 static void load_str(UINT id, char *buf, int cch)
 {
@@ -508,6 +508,71 @@ static void paint_all(HDC hdc)
  * hit testing
  * ==================================================================== */
 
+/* ======================================================================
+ * dropdown menus -- built here, drawn by menu.c
+ *
+ * The checked state lives in the model, not in an HMENU, so the menu is
+ * assembled fresh each time it opens and always reflects what is on screen.
+ * ==================================================================== */
+
+#define MENU_MAX_ITEMS 12
+
+static int build_file_menu(MenuItem *out)
+{
+    int n = 0;
+    Menu_Item(&out[n++], IDM_EXIT, IDS_MENU_EXIT, 0);
+    return n;
+}
+
+static int build_edit_menu(MenuItem *out)
+{
+    int n = 0;
+    Menu_Item(&out[n++], IDM_RESET_TRIP, IDS_MENU_RESET_TRIP, 0);
+    Menu_Item(&out[n++], IDM_RESET_MAX,  IDS_MENU_RESET_MAX,  0);
+    return n;
+}
+
+/* The View and Statistics menus carry state, so they are assembled on the fly
+ * and always reflect what is actually on screen. */
+static int build_view_menu(MenuItem *out)
+{
+    int n = 0;
+    Menu_Item(&out[n++], IDM_SHOW_WIDGET, IDS_MENU_WIDGET, 0);
+    Menu_Item(&out[n++], 0, 0, MIF_SEPARATOR);
+    Menu_Item(&out[n++], IDM_SHOW_KPM, IDS_MENU_KPM,
+              s_model.mode_kpm ? MIF_CHECKED : 0);
+    Menu_Item(&out[n++], IDM_SHOW_GEAR, IDS_MENU_GEAR,
+              s_model.show_gate ? MIF_CHECKED : 0);
+    Menu_Item(&out[n++], 0, 0, MIF_SEPARATOR);
+    Menu_Item(&out[n++], IDM_TM_AUTO, IDS_MENU_AUTO,
+              (s_model.transmission == KTM_AUTO) ? (MIF_CHECKED | MIF_RADIO) : 0);
+    Menu_Item(&out[n++], IDM_TM_MANUAL, IDS_MENU_MANUAL,
+              (s_model.transmission == KTM_MANUAL) ? (MIF_CHECKED | MIF_RADIO) : 0);
+    Menu_Item(&out[n++], 0, 0, MIF_SEPARATOR);
+    Menu_Item(&out[n++], IDM_TOPMOST, IDS_MENU_TOPMOST,
+              s_model.topmost ? MIF_CHECKED : 0);
+    return n;
+}
+
+static int build_stats_menu(MenuItem *out)
+{
+    int n = 0;
+    Menu_Item(&out[n++], IDM_WIN5, IDS_MENU_WIN5,
+              (s_model.window_secs == 5) ? (MIF_CHECKED | MIF_RADIO) : 0);
+    Menu_Item(&out[n++], IDM_WIN10, IDS_MENU_WIN10,
+              (s_model.window_secs == 10) ? (MIF_CHECKED | MIF_RADIO) : 0);
+    Menu_Item(&out[n++], IDM_WIN30, IDS_MENU_WIN30,
+              (s_model.window_secs == 30) ? (MIF_CHECKED | MIF_RADIO) : 0);
+    return n;
+}
+
+static int build_help_menu(MenuItem *out)
+{
+    int n = 0;
+    Menu_Item(&out[n++], IDM_ABOUT, IDS_MENU_ABOUT, 0);
+    return n;
+}
+
 /* kind: 0 = nothing, 1 = control (id set), 2 = caption drag */
 static int hit_test(POINT pt, int *id)
 {
@@ -543,33 +608,39 @@ static int hit_test(POINT pt, int *id)
 
 static void show_menu(HWND hwnd, int index)
 {
-    HMENU sub;
+    MenuItem items[MENU_MAX_ITEMS];
+    MenuDef def;
     HDC hdc;
     RECT cell, wr;
     POINT pt;
-    int cmd;
+    int n = 0;
+    UINT cmd;
 
-    if (s_menu == NULL || index < 0)
-        return;
-    sub = GetSubMenu(s_menu, index);
-    if (sub == NULL)
-        return;
+    switch (index) {
+    case 0: n = build_file_menu(items);  break;
+    case 1: n = build_edit_menu(items);  break;
+    case 2: n = build_view_menu(items);  break;
+    case 3: n = build_stats_menu(items); break;
+    case 4: n = build_help_menu(items);  break;
+    default: return;
+    }
+    def.items = items;
+    def.count = n;
 
     hdc = GetDC(hwnd);
-    if (!menubar_item_rect(hdc, index, &cell))
+    if (!menubar_item_rect(hdc, index, &cell)) {
         cell.left = Metrics_S(2);
+        cell.right = cell.left + Metrics_S(40);
+    }
     ReleaseDC(hwnd, hdc);
 
     GetWindowRect(hwnd, &wr);
     pt.x = wr.left + M.frame + cell.left;
     pt.y = wr.top + M.frame + M.caption + M.menubar;
 
-    cmd = (int)TrackPopupMenu(sub,
-                              TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD |
-                              TPM_RIGHTBUTTON,
-                              pt.x, pt.y, 0, hwnd, NULL);
+    cmd = Menu_Track(hwnd, &def, pt.x, pt.y);
     if (cmd != 0 && s_hooks != NULL && s_hooks->on_command != NULL)
-        s_hooks->on_command(hwnd, cmd);
+        s_hooks->on_command(hwnd, (int)cmd);
     InvalidateRect(hwnd, NULL, FALSE);
 }
 
@@ -742,8 +813,6 @@ HWND Ui_Create(HINSTANCE hInst, const UiHooks *hooks)
     Metrics_Init(NULL);          /* system DPI, before a window exists */
     load_strings();
 
-    s_menu = LoadMenuA(hInst, MAKEINTRESOURCEA(IDM_MAIN));
-
     ZeroMemory(&wc, sizeof(wc));
     wc.style = CS_DROPSHADOW | CS_BYTEALIGNWINDOW;
     wc.lpfnWndProc = Ui_WndProc;
@@ -862,32 +931,6 @@ void Ui_InvalidateDynamic(HWND hwnd)
 {
     if (hwnd != NULL)
         InvalidateRect(hwnd, NULL, FALSE);
-}
-
-HMENU Ui_BuildMenu(void)
-{
-    return s_menu;
-}
-
-static void check_item(HMENU m, UINT id, int on)
-{
-    CheckMenuItem(m, id, MF_BYCOMMAND | (on ? MF_CHECKED : MF_UNCHECKED));
-}
-
-void Ui_SyncMenu(HWND hwnd, const UiModel *m)
-{
-    HMENU view;
-    UNUSED(hwnd);
-    if (s_menu == NULL)
-        return;
-    view = GetSubMenu(s_menu, 2);
-    if (view != NULL) {
-        check_item(view, IDM_SHOW_KPM, m->mode_kpm);
-        check_item(view, IDM_SHOW_GEAR, m->show_gate);
-        check_item(view, IDM_TM_AUTO, m->transmission == KTM_AUTO);
-        check_item(view, IDM_TM_MANUAL, m->transmission == KTM_MANUAL);
-        check_item(view, IDM_SHOW_WIDGET, m->widget);
-    }
 }
 
 void Ui_ShowAbout(HWND hwnd)

@@ -80,4 +80,21 @@
 #define IDS_WIDGET_MENU_EXIT    2072
 #define IDS_FMT_SCALE           2073   /* "%d DPI  %d%%" */
 
+/* Dropdown menu items. The menus are drawn by src/ui/menu.c, so their text
+ * lives here with every other user-visible string. A tab separates the label
+ * from the shortcut column, and & marks the mnemonic. */
+#define IDS_MENU_EXIT           2080
+#define IDS_MENU_RESET_TRIP     2081
+#define IDS_MENU_RESET_MAX      2082
+#define IDS_MENU_WIDGET         2083
+#define IDS_MENU_KPM            2084
+#define IDS_MENU_GEAR           2085
+#define IDS_MENU_AUTO           2086
+#define IDS_MENU_MANUAL         2087
+#define IDS_MENU_TOPMOST        2088
+#define IDS_MENU_WIN5           2089
+#define IDS_MENU_WIN10          2090
+#define IDS_MENU_WIN30          2091
+#define IDS_MENU_ABOUT          2092
+
 #endif /* KEYODO_RESOURCE_H */

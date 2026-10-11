@@ -30,9 +30,9 @@ if /i "%TARGET%"=="clean" (
 )
 
 rem ---------------------------------------------------------------- sources
-set "SRCS=src\main.c src\app.c src\common.c src\platform\platform.c src\ui\ui.c src\ui\theme.c src\ui\widgets.c src\ui\gauge.c src\ui\gear.c src\ui\metrics.c src\ui\widget.c src\stats\stats.c src\input\input.c src\input\input_raw.c src\input\input_hook.c src\storage\storage.c"
+set "SRCS=src\main.c src\app.c src\common.c src\platform\platform.c src\ui\ui.c src\ui\theme.c src\ui\widgets.c src\ui\menu.c src\ui\gauge.c src\ui\gear.c src\ui\metrics.c src\ui\widget.c src\stats\stats.c src\input\input.c src\input\input_raw.c src\input\input_hook.c src\storage\storage.c"
 
-set "OBJS=%OUTDIR%\main.obj %OUTDIR%\app.obj %OUTDIR%\common.obj %OUTDIR%\platform.obj %OUTDIR%\ui.obj %OUTDIR%\theme.obj %OUTDIR%\widgets.obj %OUTDIR%\gauge.obj %OUTDIR%\gear.obj %OUTDIR%\metrics.obj %OUTDIR%\widget.obj %OUTDIR%\stats.obj %OUTDIR%\input.obj %OUTDIR%\input_raw.obj %OUTDIR%\input_hook.obj %OUTDIR%\storage.obj"
+set "OBJS=%OUTDIR%\main.obj %OUTDIR%\app.obj %OUTDIR%\common.obj %OUTDIR%\platform.obj %OUTDIR%\ui.obj %OUTDIR%\theme.obj %OUTDIR%\widgets.obj %OUTDIR%\menu.obj %OUTDIR%\gauge.obj %OUTDIR%\gear.obj %OUTDIR%\metrics.obj %OUTDIR%\widget.obj %OUTDIR%\stats.obj %OUTDIR%\input.obj %OUTDIR%\input_raw.obj %OUTDIR%\input_hook.obj %OUTDIR%\storage.obj"
 
 if not exist "%OUTDIR%" mkdir "%OUTDIR%"
 if not exist "%DISTDIR%" mkdir "%DISTDIR%"

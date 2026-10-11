@@ -25,40 +25,9 @@ IDI_KEYODO      ICON    "keyodo.ico"
 /* ------------------------------------------------------------------- menu */
 /* "&" marks the accelerator and is not displayed; the "(F)" in the caption is
  * part of the string, matching the Simplified-Chinese Windows convention. */
-IDM_MAIN MENU
-BEGIN
-    POPUP "文件(&F)"
-    BEGIN
-        MENUITEM "退出(&X)",                IDM_EXIT
-    END
-    POPUP "编辑(&E)"
-    BEGIN
-        MENUITEM "清零本次 TRIP(&T)",       IDM_RESET_TRIP
-        MENUITEM "复位最高值(&R)",          IDM_RESET_MAX
-    END
-    POPUP "查看(&V)"
-    BEGIN
-        MENUITEM "桌面仪表(&W)",            IDM_SHOW_WIDGET
-        MENUITEM SEPARATOR
-        MENUITEM "显示 KPM(&K)\tCtrl+K",    IDM_SHOW_KPM
-        MENUITEM "换挡显示(&G)",            IDM_SHOW_GEAR
-        MENUITEM SEPARATOR
-        MENUITEM "自动挡(&A)",              IDM_TM_AUTO
-        MENUITEM "手动挡(&T)\tCtrl+T",      IDM_TM_MANUAL
-        MENUITEM SEPARATOR
-        MENUITEM "总在最前(&P)",            IDM_TOPMOST
-    END
-    POPUP "统计(&S)"
-    BEGIN
-        MENUITEM "统计周期 5 秒(&5)",       IDM_WIN5
-        MENUITEM "统计周期 10 秒(&1)",      IDM_WIN10
-        MENUITEM "统计周期 30 秒(&3)",      IDM_WIN30
-    END
-    POPUP "帮助(&H)"
-    BEGIN
-        MENUITEM "关于 KeyODO(&A)...",      IDM_ABOUT
-    END
-END
+/* The dropdown menus are drawn by src/ui/menu.c and their text
+ * lives in the string table below. There is deliberately no MENU
+ * resource: a second copy of the item text would silently rot. */
 
 IDM_MAIN ACCELERATORS
 BEGIN
@@ -96,6 +65,20 @@ BEGIN
     IDS_WIDGET_MENU_HIDE   "隐藏桌面仪表(&H)"
     IDS_WIDGET_MENU_EXIT   "退出(&X)"
     IDS_FMT_SCALE          "%d DPI  %d%%"
+
+    IDS_MENU_EXIT          "退出(&X)\tAlt+F4"
+    IDS_MENU_RESET_TRIP    "清零本次 TRIP(&T)\tCtrl+T"
+    IDS_MENU_RESET_MAX     "复位最高值(&R)"
+    IDS_MENU_WIDGET        "桌面仪表(&W)"
+    IDS_MENU_KPM           "显示 KPM(&K)\tCtrl+K"
+    IDS_MENU_GEAR          "换挡显示(&G)"
+    IDS_MENU_AUTO          "自动挡(&A)"
+    IDS_MENU_MANUAL        "手动挡(&T)"
+    IDS_MENU_TOPMOST       "总在最前(&P)"
+    IDS_MENU_WIN5          "统计最近 5 秒(&5)"
+    IDS_MENU_WIN10         "统计最近 10 秒(&1)"
+    IDS_MENU_WIN30         "统计最近 30 秒(&3)"
+    IDS_MENU_ABOUT         "关于 KeyODO(&A)..."
 END
 
 /* ---------------------------------------------------------------- version */

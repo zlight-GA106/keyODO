@@ -43,6 +43,8 @@ typedef struct UiModel {
     int    pressed;      /* IDC_* currently drawn pressed, or 0 */
     int    active;       /* window has focus, caption is drawn active */
     int    widget;       /* detached desktop gauge is visible */
+    int    topmost;      /* window is pinned above others      */
+    int    window_secs;  /* statistics window: 5, 10 or 30     */
 } UiModel;
 
 typedef struct UiHooks {
@@ -61,8 +63,6 @@ void Ui_SetModel(HWND hwnd, const UiModel *m);
 const UiModel *Ui_GetModel(void);
 
 /* Rebuilds the popup menu and ticks the current state. */
-HMENU Ui_BuildMenu(void);
-void  Ui_SyncMenu(HWND hwnd, const UiModel *m);
 
 /* Shows the modal about box. */
 void Ui_ShowAbout(HWND hwnd);

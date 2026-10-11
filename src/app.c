@@ -21,6 +21,7 @@
 #include "common.h"
 #include "ui/ui.h"
 #include "ui/widget.h"
+#include "ui/menu.h"
 #include "ui/metrics.h"
 #include "stats/stats.h"
 #include "input/input.h"
@@ -110,6 +111,8 @@ static void build_model(void)
     s_ui.pressed = Ui_GetModel()->pressed;
     s_ui.active = Ui_GetModel()->active;
     s_ui.widget = (s_widget != NULL) && Widget_IsVisible(s_widget);
+    s_ui.topmost = s_store.always_on_top;
+    s_ui.window_secs = s_store.window_secs;
 }
 
 static void build_widget(void)
@@ -149,7 +152,6 @@ static void widget_show(int show)
         Widget_PlaceClamped(s_widget, x, y);
     }
     refresh();
-    Ui_SyncMenu(s_hwnd, &s_ui);
 }
 
 static void widget_remember(void)
@@ -164,30 +166,23 @@ static void widget_remember(void)
 
 static void widget_context(HWND hwnd, POINT pt)
 {
-    HMENU m;
-    char sMain[64], sHide[64], sExit[64];
-    int cmd;
+    MenuItem items[4];
+    MenuDef def;
+    UINT cmd;
 
-    UNUSED(hwnd);
-    m = CreatePopupMenu();
-    if (m == NULL)
-        return;
-    LoadStringA(s_inst, IDS_WIDGET_MENU_MAIN, sMain, sizeof(sMain));
-    LoadStringA(s_inst, IDS_WIDGET_MENU_HIDE, sHide, sizeof(sHide));
-    LoadStringA(s_inst, IDS_WIDGET_MENU_EXIT, sExit, sizeof(sExit));
-
-    AppendMenuA(m, MF_STRING, IDM_WIDGET_SHOWMAIN, sMain);
-    AppendMenuA(m, MF_STRING, IDM_WIDGET_HIDE, sHide);
-    AppendMenuA(m, MF_SEPARATOR, 0, NULL);
-    AppendMenuA(m, MF_STRING, IDM_EXIT, sExit);
+    /* Same self-drawn menu as the main window: a themed system menu popping
+     * out of the classic gauge would look just as wrong here. */
+    Menu_Item(&items[0], IDM_WIDGET_SHOWMAIN, IDS_WIDGET_MENU_MAIN, 0);
+    Menu_Item(&items[1], IDM_WIDGET_HIDE,     IDS_WIDGET_MENU_HIDE, 0);
+    Menu_Item(&items[2], 0, 0, MIF_SEPARATOR);
+    Menu_Item(&items[3], IDM_EXIT,            IDS_WIDGET_MENU_EXIT, 0);
+    def.items = items;
+    def.count = 4;
 
     SetForegroundWindow(hwnd);
-    cmd = (int)TrackPopupMenu(m, TPM_LEFTALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD,
-                              pt.x, pt.y, 0, hwnd, NULL);
-    DestroyMenu(m);
-
+    cmd = Menu_Track(hwnd, &def, pt.x, pt.y);
     if (cmd != 0)
-        on_command(s_hwnd, cmd);
+        on_command(s_hwnd, (int)cmd);
 }
 
 static void widget_moved(HWND hwnd)
@@ -305,7 +300,6 @@ static void on_command(HWND hwnd, int id)
     Stats_Tick(Plat_TickMs());
     refresh();
     if (needMenuSync)
-        Ui_SyncMenu(hwnd, &s_ui);
     Ui_InvalidateDynamic(hwnd);
 }
 
@@ -441,7 +435,6 @@ int App_Init(HINSTANCE hInst, const char *cmdLine)
         apply_topmost();
 
     refresh();
-    Ui_SyncMenu(s_hwnd, &s_ui);
 
     if (s_store.widget_shown)
         widget_show(1);

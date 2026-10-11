@@ -48,6 +48,7 @@ dist\KeyODO_Setup.exe /S /D=C:\KeyODO
 | **换挡显示** | 档位闸，当前档反白；R 档红色 |
 | **桌面仪表** | 把速度表单独抽出来当桌面小组件悬浮显示（见下） |
 | **分辨率与缩放** | 1080p / 2K / 4K 及 100%–200% 缩放，16:9 与 16:10 都能正确摆放（见下） |
+| **自绘菜单** | 下拉菜单也是自绘的，不用系统 `TrackPopupMenu`，因此不会被主题化 |
 | **总在最前** | 可选 |
 
 读数模式、变速模式、窗口位置、桌面仪表的位置与开关、统计窗口长度都会随统计数据一起保存。
@@ -192,6 +193,7 @@ python tools\verify_resolution_matrix.py      :: 1080p/2K/4K × 16:9/16:10 是�
 python tools\widget_test.py                   :: 桌面仪表的圆形裁剪、位置、越界与持久化
 python tools\needle_test.py                   :: 从截图量指针角度，验证回落曲线
 python tools\installer_ui_test.py             :: 构建可非提权运行的副本并逐页截图安装向导
+python tools\menu_test.py                     :: 下拉菜单的键盘导航、生效、取消与关闭
 python tools\make_dial_icon.py                :: 用程序自己画的速度表生成 res/keyodo.ico
 python tools\probe_rawinput.py                :: 独立验证 Raw Input 能否收到注入按键
 ```
