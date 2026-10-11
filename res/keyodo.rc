@@ -1,0 +1,123 @@
+/* ===========================================================================
+ * keyodo.rc -- KeyODO resources.
+ *
+ * ENCODING
+ *   Windows 98 SE is an ANSI platform: resources must be code page 936 (GBK),
+ *   not UTF-16 and not UTF-8. This file is kept in UTF-8 for review, and the
+ *   pragma below tells a modern rc.exe how to read it. For the Windows 98 SE
+ *   era toolchain (MSVC 6 rc.exe, which ignores the pragma) convert first:
+ *       python tools/to_cp936.py res/keyodo.rc
+ *
+ * All user-visible Chinese lives here. No .c file contains a non-ASCII byte,
+ * so the sources cannot be corrupted by an editor guessing the wrong encoding.
+ * ======================================================================== */
+
+#pragma code_page(936)
+
+#include <windows.h>
+#include "resource.h"
+
+/* ------------------------------------------------------------------- icon */
+/* 16-colour ICO with 16x16 and 32x32 images and no alpha channel: a 32-bit
+ * alpha icon renders as a black block on Windows 98 SE. */
+IDI_KEYODO      ICON    "keyodo.ico"
+
+/* ------------------------------------------------------------------- menu */
+/* "&" marks the accelerator and is not displayed; the "(F)" in the caption is
+ * part of the string, matching the Simplified-Chinese Windows convention. */
+IDM_MAIN MENU
+BEGIN
+    POPUP "文件(&F)"
+    BEGIN
+        MENUITEM "退出(&X)",                IDM_EXIT
+    END
+    POPUP "编辑(&E)"
+    BEGIN
+        MENUITEM "清零本次 TRIP(&T)",       IDM_RESET_TRIP
+        MENUITEM "复位最高值(&R)",          IDM_RESET_MAX
+    END
+    POPUP "查看(&V)"
+    BEGIN
+        MENUITEM "显示 KPM(&K)\tCtrl+K",    IDM_SHOW_KPM
+        MENUITEM "换挡显示(&G)",            IDM_SHOW_GEAR
+        MENUITEM SEPARATOR
+        MENUITEM "自动挡(&A)",              IDM_TM_AUTO
+        MENUITEM "手动挡(&T)\tCtrl+T",      IDM_TM_MANUAL
+        MENUITEM SEPARATOR
+        MENUITEM "总在最前(&P)",            IDM_TOPMOST
+    END
+    POPUP "统计(&S)"
+    BEGIN
+        MENUITEM "统计周期 5 秒(&5)",       IDM_WIN5
+        MENUITEM "统计周期 10 秒(&1)",      IDM_WIN10
+        MENUITEM "统计周期 30 秒(&3)",      IDM_WIN30
+    END
+    POPUP "帮助(&H)"
+    BEGIN
+        MENUITEM "关于 KeyODO(&A)...",      IDM_ABOUT
+    END
+END
+
+IDM_MAIN ACCELERATORS
+BEGIN
+    "K",            IDM_SHOW_KPM,       VIRTKEY, CONTROL
+    "T",            IDM_TM_MANUAL,      VIRTKEY, CONTROL
+END
+
+/* ---------------------------------------------------------- string table */
+STRINGTABLE DISCARDABLE
+BEGIN
+    IDS_APP_TITLE       "KeyODO"
+
+    IDS_MENU_FILE       "文件(F)"
+    IDS_MENU_EDIT       "编辑(E)"
+    IDS_MENU_VIEW       "查看(V)"
+    IDS_MENU_STATS      "统计(S)"
+    IDS_MENU_HELP       "帮助(H)"
+
+    IDS_GB_SPEED        "速度表"
+    IDS_GB_ODO          "里程表"
+    IDS_GB_RATE         "速率"
+
+    IDS_LBL_ODO         "ODO:"
+    IDS_LBL_TRIP        "TRIP:"
+    IDS_LBL_KPM         "KPM:"
+    IDS_LBL_MAX         "MAX:"
+
+    IDS_BTN_TRIP        "清零(C)"
+    IDS_BTN_PEAK        "复位(R)"
+
+    IDS_STATUS_READY    "就绪"
+    IDS_ABOUT_TITLE     "关于 KeyODO"
+    IDS_ABOUT_TEXT      "KeyODO 0.1\n\n键盘里程表：统计按键次数、WPM 与 KPM。\n\n只记录按键次数，不记录任何输入内容。"
+END
+
+/* ---------------------------------------------------------------- version */
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     KEYODO_VERSION_NUM
+PRODUCTVERSION  KEYODO_VERSION_NUM
+FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+FILEFLAGS       0x0L
+FILEOS          VOS__WINDOWS32
+FILETYPE        VFT_APP
+FILESUBTYPE     VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        /* 0804 = Simplified Chinese, 04B0 = Unicode code page slot */
+        BLOCK "080404B0"
+        BEGIN
+            VALUE "CompanyName",      "zlight-GA106"
+            VALUE "FileDescription",  "KeyODO"
+            VALUE "FileVersion",      KEYODO_VERSION_STR
+            VALUE "InternalName",     "keyodo"
+            VALUE "OriginalFilename", "keyodo.exe"
+            VALUE "ProductName",      "KeyODO"
+            VALUE "ProductVersion",   KEYODO_VERSION_STR
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x804, 1200
+    END
+END
