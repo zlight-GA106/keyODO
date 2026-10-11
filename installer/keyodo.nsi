@@ -44,10 +44,22 @@
 !define MUI_UNICON "${SRCDIR}\res\keyodo.ico"
 
 Name "${APP_NAME} ${APP_VERSION}"
-OutFile "${DISTDIR}\KeyODO_Setup.exe"
+/* tools/installer_ui_test.py builds with /DUITEST to get a copy it can launch
+ * and walk through: an admin installer raises a UAC prompt a script cannot
+ * answer, and a wizard nobody can open is a wizard nobody checks. A shipped
+ * build never defines this. */
+!ifdef UITEST
+  RequestExecutionLevel user
+  !define SETUP_NAME "KeyODO_Setup_uitest.exe"
+!else
+  RequestExecutionLevel admin
+  !ifndef SETUP_NAME
+    !define SETUP_NAME "KeyODO_Setup.exe"
+  !endif
+!endif
+OutFile "${DISTDIR}\${SETUP_NAME}"
 InstallDir "$PROGRAMFILES\${APP_NAME}"
 InstallDirRegKey HKLM "${APP_KEY}" "InstallDir"
-RequestExecutionLevel admin
 SetCompressor /SOLID lzma
 ShowInstDetails show
 ShowUninstDetails show
@@ -111,7 +123,10 @@ notElevated:
 FunctionEnd
 
 Function .onInit
+  /* The UI test build must reach the pages, so it skips the privilege probe. */
+!ifndef UITEST
   Call CheckAdmin
+!endif
 
   /* Refuse to overwrite a running instance: keyodo.exe would be locked. */
   FindWindow $0 "KeyODO_Main" ""
@@ -138,7 +153,17 @@ done:
 FunctionEnd
 
 /* --- sections ----------------------------------------------------------- */
-Section "!${APP_NAME}" SEC_MAIN
+/* Section names go through LangString rather than being written as literals.
+ * A literal non-ASCII string in the script is converted once, at parse time,
+ * from the script's charset into the installer's codepage -- and that
+ * conversion is what turned these into "????????" in the component list.
+ * LangString values live in the language table, which NSIS encodes per
+ * language, so they survive (the shortcut names already relied on this). */
+LangString SEC_MAIN_NAME      ${LANG_SIMPCHINESE} "KeyODO 程序文件（必需）"
+LangString SEC_STARTMENU_NAME ${LANG_SIMPCHINESE} "开始菜单快捷方式"
+LangString SEC_DESKTOP_NAME   ${LANG_SIMPCHINESE} "桌面快捷方式"
+
+Section "$(SEC_MAIN_NAME)" SEC_MAIN
   SectionIn RO
   SetShellVarContext all
   SetOutPath "$INSTDIR"
@@ -169,7 +194,7 @@ Section "!${APP_NAME}" SEC_MAIN
   WriteRegDWORD HKLM "${UNINST_KEY}" "EstimatedSize" "$0"
 SectionEnd
 
-Section "开始菜单快捷方式" SEC_STARTMENU
+Section "$(SEC_STARTMENU_NAME)" SEC_STARTMENU
   SectionIn RO
   SetShellVarContext all
   CreateDirectory "$SMPROGRAMS\$(SM_GROUP)"
@@ -179,7 +204,7 @@ Section "开始菜单快捷方式" SEC_STARTMENU
                  "$INSTDIR\uninstall.exe" "" "$INSTDIR\uninstall.exe" 0
 SectionEnd
 
-Section "桌面快捷方式" SEC_DESKTOP
+Section "$(SEC_DESKTOP_NAME)" SEC_DESKTOP
   SetShellVarContext all
   CreateShortCut "$DESKTOP\$(LNK_APP).lnk" \
                  "$INSTDIR\${APP_EXE}" "" "$INSTDIR\${APP_EXE}" 0

@@ -81,22 +81,26 @@ static void load_strings(void)
  * application icon, drawn with the pinned palette
  * ==================================================================== */
 
+/* Title-bar icon: the same speedometer the program draws, reduced to 16x16.
+ * Kept as a character mask rather than a scaled bitmap so it stays crisp at
+ * every DPI (each cell becomes Metrics.unit device pixels) and matches
+ * res/keyodo.ico, which is rendered from the real dial. */
 static const char *kIcon16[16] = {
     "................",
     "................",
-    ".##############.",
-    ".#wwwwwwwwwwww#.",
-    ".#wfkkffkkffkk#.",
-    ".#ffffffffffff#.",
-    ".#fkkffkkffkkf#.",
-    ".#ffffffffffff#.",
-    ".#fkkffkkffkkf#.",
-    ".#ffffffffffff#.",
-    ".#fffkkkkkkfff#.",
-    ".#ffffffffffff#.",
-    ".#ffffffffffff#.",
-    ".##############.",
-    "................",
+    ".....kkkkkk.....",
+    "...kkwwwwwwkk...",
+    "..kwwwwwwwwwwk..",
+    ".kwwwwwwwwwwwwk.",
+    ".kwwwwwwwrrwwwk.",
+    "kwwwwwwwwrrwwwwk",
+    "kwwwwwww#wwwwwwk",
+    "kwwwwww#wwwwwwwk",
+    ".kwwww#wwwwwwwk.",
+    ".kwww#wwwwwwwwk.",
+    "..kw#wwwwwwwwk..",
+    "...kkwwwwwwkk...",
+    ".....kkkkkk.....",
     "................"
 };
 
@@ -116,6 +120,7 @@ static void draw_icon(HDC hdc, int ox, int oy)
             case 'w': c = t->hilight; break;
             case 'f': c = t->face;    break;
             case 'k': c = t->shadow;  break;
+            case 'r': c = t->red;     break;
             default:  continue;
             }
             r.left = ox + x * u;

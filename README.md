@@ -191,6 +191,8 @@ python tools\verify_scaling.py                :: 100/125/150/200% 是否真的�
 python tools\verify_resolution_matrix.py      :: 1080p/2K/4K × 16:9/16:10 是否放得下
 python tools\widget_test.py                   :: 桌面仪表的圆形裁剪、位置、越界与持久化
 python tools\needle_test.py                   :: 从截图量指针角度，验证回落曲线
+python tools\installer_ui_test.py             :: 构建可非提权运行的副本并逐页截图安装向导
+python tools\make_dial_icon.py                :: 用程序自己画的速度表生成 res/keyodo.ico
 python tools\probe_rawinput.py                :: 独立验证 Raw Input 能否收到注入按键
 ```
 

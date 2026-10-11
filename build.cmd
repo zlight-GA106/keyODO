@@ -128,6 +128,19 @@ if errorlevel 1 (
     exit /b 1
 )
 
+rem A running installer holds its own executable open, and makensis then fails
+rem with a bare "Can't open output file". Detect that first and say what to do.
+if exist "%DISTDIR%\KeyODO_Setup.exe" (
+    del /f /q "%DISTDIR%\KeyODO_Setup.exe" 2>nul
+    if exist "%DISTDIR%\KeyODO_Setup.exe" (
+        echo ERROR: %DISTDIR%\KeyODO_Setup.exe is in use.
+        echo        Close any running KeyODO installer or uninstaller window
+        echo        ^(including one left behind after a refused UAC prompt^),
+        echo        then run build.cmd again.
+        exit /b 1
+    )
+)
+
 "%MAKENSIS%" /V2 /DSRCDIR="%CD%" /DOUTDIR="%CD%\%OUTDIR%" /DDISTDIR="%CD%\%DISTDIR%" "%OUTDIR%\keyodo_utf8.nsi"
 if errorlevel 1 (
     echo ERROR: makensis failed.

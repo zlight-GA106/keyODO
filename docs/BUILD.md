@@ -153,8 +153,36 @@ python tools\verify_resolution_matrix.py
 :: 桌面仪表的显示、尺寸、位置恢复、越界钳制与持久化
 python tools\widget_test.py
 
+:: 安装向导逐页截图（自己构建一个可非提权运行的副本）
+python tools\installer_ui_test.py
+
 :: 独立验证 Raw Input 在本机是否真的能收到注入按键
 python tools\probe_rawinput.py
+```
+
+### 安装向导的中文
+
+NSIS 3.x 的 `makensis` 默认产出 **ANSI** 安装程序（构建日志里的 `writing output (x86-ansi)`），
+脚本里的非 ASCII **字面量**会在解析时按代码页转换一次——转不了就变成 `?`。所以安装脚本里
+不能有中文字面量：`Section` 名、快捷方式名、提示语全部走 `LangString`，它们存在语言表里，
+按语言编码，不受这条转换影响。
+
+`tools\installer_ui_test.py` 用 `/DUITEST` 构建一个非提权的副本再逐页截图。之所以要另建一个：
+正式的安装程序请求管理员权限，UAC 弹窗脚本答不了，而打不开的向导就等于没人检查——
+组件列表里的一串 `??????` 就是这样漏出去的。
+
+### 图标
+
+`res/keyodo.ico` 由 `tools\make_dial_icon.py` 从**程序自己绘制**的速度表生成：把桌面仪表
+以 4 倍缩放渲染成 688×688，裁成正圆，再降采样成 16 / 32 / 48（4bpp，Win98SE 认得的形式）
+与 64 / 128（32bpp）。不含 PNG 压缩项——那是 Vista 才有的，老 shell 读不了。
+
+标题栏图标是 `src/ui/ui.c` 里的 `kIcon16` 字符掩码，画的是同一个表盘，因此标题栏、任务栏、
+快捷方式和 exe 图标四处一致。改动图标后要同步这两处，并重新生成设计稿：
+
+```cmd
+python tools\make_dial_icon.py --source build\dial_hi.png --out res\keyodo.ico
+python mockup\keyodo_mockup.py
 ```
 
 ### 指定缩放（调试与偏好）
@@ -186,6 +214,8 @@ keyodo.exe --input=hook
 | `Bad text encoding: keyodo.nsi` | 直接把 `installer\keyodo.nsi` 交给 `makensis` 了；请用 `build.cmd`，它会先补 UTF-8 BOM |
 | 安装程序退出码 5 | 没有管理员权限；右键→以管理员身份运行 |
 | 安装程序退出码 2 | KeyODO 正在运行，先退出 |
+| `ERROR: dist\KeyODO_Setup.exe is in use` | 有一个安装程序或卸载程序窗口还开着（包括 UAC 被拒绝后残留的进程），它锁住了自己的可执行文件。关掉它再构建 |
+| 安装向导里出现 `??????` | 脚本里的非 ASCII 字面量没有走 LangString。`Section` 名、快捷方式名等一律用 `LangString` 定义 |
 | 菜单显示成乱码 | 资源没有转成 CP936；用 `build.cmd` 而不是手工调用 `rc.exe` |
 | 界面在高分屏上显得小 | 见下 |
 

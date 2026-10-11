@@ -127,27 +127,31 @@ VAL_KPM = 310
 VAL_UPTIME = "00:12:34"
 
 # ---------------------------------------------------------------------------
-# icon: 16x16 keyboard, hand-drawn in the Win98 16-colour palette
+# icon: 16x16 speedometer -- the same instrument the program draws, reduced.
+# This mirrors kIcon16 in src/ui/ui.c and res/keyodo.ico, which is rendered
+# from the real dial, so the title bar, the task bar and the shortcuts all
+# show the same thing.
 # ---------------------------------------------------------------------------
 ICON16 = [
     "................",
     "................",
-    ".##############.",
-    ".#wwwwwwwwwwww#.",
-    ".#wfkkffkkffkk#.",
-    ".#ffffffffffff#.",
-    ".#fkkffkkffkkf#.",
-    ".#ffffffffffff#.",
-    ".#fkkffkkffkkf#.",
-    ".#ffffffffffff#.",
-    ".#fffkkkkkkfff#.",
-    ".#ffffffffffff#.",
-    ".#ffffffffffff#.",
-    ".##############.",
-    "................",
+    ".....kkkkkk.....",
+    "...kkwwwwwwkk...",
+    "..kwwwwwwwwwwk..",
+    ".kwwwwwwwwwwwwk.",
+    ".kwwwwwwwrrwwwk.",
+    "kwwwwwwwwrrwwwwk",
+    "kwwwwwww#wwwwwwk",
+    "kwwwwww#wwwwwwwk",
+    ".kwwww#wwwwwwwk.",
+    ".kwww#wwwwwwwwk.",
+    "..kw#wwwwwwwwk..",
+    "...kkwwwwwwkk...",
+    ".....kkkkkk.....",
     "................",
 ]
-ICON_INK = {"#": (0, 0, 0), "f": C["BTNFACE"], "k": C["BTNSHADOW"], "w": C["BTNHIGHLIGHT"]}
+ICON_INK = {"#": (0, 0, 0), "f": C["BTNFACE"], "k": C["BTNSHADOW"],
+            "w": C["BTNHIGHLIGHT"], "r": (255, 0, 0)}
 
 
 def make_icon():
